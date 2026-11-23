@@ -969,9 +969,7 @@ function segnaMancanti() { // evidenzia i campi da compilare; restituisce le rig
 function primoMancante() { const el = $('#r-tab tr.riga-nuova .errato'); if (el) el.focus({ preventScroll: false }); }
 function aggiungiNuova() {
   if (!puoAggiungere()) return toast('Scegli prima la scheda', 'err');
-  if (S.nuove.length) {
-    if (segnaMancanti()) { primoMancante(); return toast('Completa prima la riga nuova già aperta: ' + mancanti(S.nuove.find(n => mancanti(n).length)).map(k => NOMI_CAMPI[k]).join(', '), 'err'); }
-  } else S.nuoveScheda = schedaFoglio();
+  if (!S.nuove.length) S.nuoveScheda = schedaFoglio(); // si possono aprire più righe nuove e salvarle tutte insieme
   const p = S.nuove.length ? S.nuove[S.nuove.length - 1] : (S.ultimi || {});
   S.nuove.push({ stato_elab: isMag() ? (p.stato_elab || 'Si') : 'Si', data: p.data || oggi(), bollettino: p.bollettino || '', conceria: p.conceria || '',
     team_leader: p.team_leader ?? (S.opSet.has(S.profilo.nome) ? S.profilo.nome : ''), sku: p.sku || '', componente: '', pz_ko: '', motivazione: '', operatore: '', materiale: '', note: '' });
@@ -991,7 +989,11 @@ function annullaNuove() {
   if (!confirm(`Annullare ${S.nuove.length === 1 ? 'la riga nuova' : 'le ' + S.nuove.length + ' righe nuove'} non salvate?`)) return;
   S.nuove = []; salvaNuoveLocale(); disegnaRighe();
 }
+const rigaVuota = n => !n.componente && !String(n.pz_ko ?? '').trim() && !String(n.motivazione || '').trim() && !String(n.operatore || '').trim() && !String(n.note || '').trim();
 async function salvaNuove() {
+  const vuote = S.nuove.filter(rigaVuota).length;
+  if (vuote === S.nuove.length) { segnaMancanti(); primoMancante(); return toast('Compila almeno una riga', 'err'); }
+  if (vuote) { S.nuove = S.nuove.filter(n => !rigaVuota(n)); salvaNuoveLocale(); disegnaRighe(); toast(vuote === 1 ? 'Tolta la riga lasciata vuota' : `Tolte ${vuote} righe lasciate vuote`); }
   const inc = segnaMancanti();
   if (inc) { primoMancante(); return toast(`${inc === 1 ? 'Una riga non è completa' : inc + ' righe non sono complete'}: compila i campi evidenziati in rosso`, 'err'); }
   const righe = S.nuove.map(n => ({ data: n.data, bollettino: String(n.bollettino || '').trim(), conceria: n.conceria, team_leader: String(n.team_leader || '').trim(),
