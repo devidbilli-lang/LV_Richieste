@@ -916,7 +916,19 @@ function eventiNuove() {
   // Tab / Maiusc+Tab: la tabella resta ferma finché la cella è visibile; appena si supera l'ultima cella visibile
   // lo scorrimento riparte da lì (la cella appena compilata diventa la prima a sinistra) fino alla fine del foglio
   let clic = 0, prima = null;
-  tb.addEventListener('mousedown', () => { clic = Date.now(); });
+  const posX = (w, el) => { const r = el.getBoundingClientRect(), o = w.getBoundingClientRect().left + w.clientLeft - w.scrollLeft; return [r.left - o, r.right - o]; };
+  // clic su una cella tagliata a metà: la tabella scorre subito (prima che si apra l'elenco) e riparte dalla cella accanto
+  tb.addEventListener('mousedown', e => {
+    clic = Date.now();
+    const td = e.target.closest('tr.riga-nuova td, #riga-edit td'), w = $('#r-tab .tabwrap');
+    if (!td || !w || w.scrollWidth <= w.clientWidth) return;
+    const vw = w.clientWidth, sl = w.scrollLeft, [a, b] = posX(w, td);
+    let dest = sl;
+    if (b > sl + vw) { const v = td.previousElementSibling && posX(w, td.previousElementSibling); dest = v && b - v[0] <= vw ? v[0] : a; }
+    else if (a < sl) { const v = td.nextElementSibling && posX(w, td.nextElementSibling); dest = v && v[1] - a <= vw ? v[1] - vw : b - vw; }
+    dest = Math.max(0, Math.min(dest, w.scrollWidth - vw));
+    if (dest !== sl) w.scrollLeft = dest;
+  }, true);
   tb.addEventListener('keydown', e => {
     if (e.key !== 'Tab') return;
     const w = $('#r-tab .tabwrap'); if (w) prima = { sl: w.scrollLeft, td: e.target.closest('td') };
@@ -926,8 +938,7 @@ function eventiNuove() {
     if (Date.now() - clic < 400) return; // con il mouse la cella è già sotto gli occhi
     const td = e.target.closest('tr.riga-nuova td, #riga-edit td'), w = $('#r-tab .tabwrap');
     if (!td || !w || w.scrollWidth <= w.clientWidth) return;
-    const orig = w.getBoundingClientRect().left + w.clientLeft - w.scrollLeft;
-    const pos = el => { const r = el.getBoundingClientRect(); return [r.left - orig, r.right - orig]; };
+    const pos = el => posX(w, el);
     const vw = w.clientWidth, sl = p ? p.sl : w.scrollLeft, [a, b] = pos(td);
     const prec = p && p.td && p.td !== td && p.td.isConnected && tb.contains(p.td) ? pos(p.td) : null;
     let dest = sl;
