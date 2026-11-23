@@ -2172,15 +2172,18 @@ async function eseguiImportDiba() {
 }
 /* --- Database › Componenti: tabella completa di tutti gli articoli, con i campi mancanti evidenziati --- */
 // campi da compilare nel componente (rosso) e campi ricavati da Distinta base, Items BC e TDP (giallo).
-// 0 vale come compilato; gli accessori non hanno lavorazioni: niente celle rosse (né pz, CNS e tempi) e niente TDP; sec. Tingitura e sec. RMA vuoti non contano come mancanti.
+// 0 vale come compilato; gli accessori non hanno lavorazioni: niente celle rosse (né pz, CNS e tempi) e niente TDP; le infustiture in rosso solo senza tempo di taglio;
+// sec. Tingitura e sec. RMA vuoti non contano come mancanti.
 const TC_COL = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz', 'n'], ['cns_area', 'CNS area', 'n'], ['sec_taglio', 'sec. Taglio', 'n'], ['sec_prep', 'sec. Prep.', 'n'],
   ['sec_ting', 'sec. Ting.', 'n'], ['sec_rma', 'sec. RMA', 'n'], ['codice_materiale', 'Cod. materiale'], ['descr_materiale', 'Descrizione materiale'], ['prezzo', '€', 'e'], ['tdp', 'TDP', 'n'], ['tm', 'TM']];
 const DERIVATI = { codice_materiale: 'manca in Distinta base per la tipologia', prezzo: 'manca in Items BC', tdp: 'manca nella tabella TDP' };
 const vuoto = v => v === null || v === undefined || String(v).trim() === '';
 function mancantiCe(c) {
   const acc = /ACCESSORIO/i.test(c.n_materiale || '') || c.tm === 'Accessorio', m = [];
+  const inf = /INFUSTITURA/i.test(c.n_materiale || '') || c.tm === 'Infustitura';
   if (vuoto(c.n_materiale)) m.push('n_materiale');
-  if (!acc) { // gli accessori non hanno lavorazioni
+  if (inf) { if (vuoto(c.sec_taglio)) m.push('sec_taglio'); } // le infustiture si segnalano solo se manca il tempo di taglio
+  else if (!acc) { // gli accessori non hanno lavorazioni
     if (vuoto(c.n_pz)) m.push('n_pz');
     if (vuoto(c.cns_area)) m.push('cns_area');
     if (vuoto(c.sec_taglio)) m.push('sec_taglio');
@@ -2212,7 +2215,7 @@ function disegnaTuttiCe() {
       <div class="pillole" id="ct-vedi">${[['tutti', `Tutti ${fmtN(tutte.length)}`], ['manca', `Da completare ${fmtN(nManca)}`], ['ok', `Completi ${fmtN(tutte.length - nManca)}`]].map(([k, l]) => `<button data-v="${k}" class="${t.vedi === k ? 'att' : ''}">${l}</button>`).join('')}</div>
       <span class="sub">${fmtN(new Set(lista.map(c => c.codice_pf)).size)} articoli</span><div class="spazio" style="flex:1"></div>
       <span class="leg-manca">da compilare</span><span class="leg-manca d">manca in Distinta / Items BC / TDP</span></div>
-    <p class="sub" style="margin:8px 0 0">0 vale come compilato; gli accessori non hanno lavorazioni, quindi non hanno celle rosse né TDP; sec. Ting. e sec. RMA vuoti non contano come mancanti. Clic su una riga: si apre l'articolo sul campo da compilare.</p></div>
+    <p class="sub" style="margin:8px 0 0">0 vale come compilato; gli accessori non hanno lavorazioni, quindi non hanno celle rosse né TDP; le infustiture sono rosse solo se manca il tempo di taglio; sec. Ting. e sec. RMA vuoti non contano come mancanti. Clic su una riga: si apre l'articolo sul campo da compilare.</p></div>
     <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}">${l}</th>`).join('')}<th>Stato</th></tr></thead>
       <tbody>${pagina.map(c => `<tr class="clic ${c.padre ? 'tt-rinf' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
         <td><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
