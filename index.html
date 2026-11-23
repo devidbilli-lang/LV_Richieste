@@ -1578,7 +1578,7 @@ function vistaAnalytics() {
   $('#vista').innerHTML = `<div class="filtri no-print">
       <select id="da-anno" class="filtro-sel" title="Anno"><option>${esc(S.filtri.da.anno)}</option></select>
       <span class="sub" id="da-info"></span><div class="spazio" style="flex:1"></div>
-      <button class="btn" onclick="impostaBorse()" title="Da dove si leggono le borse prodotte">Borse prodotte · NEXUS</button>
+      <button class="btn" onclick="impostaBorse()" title="Da dove si leggono le borse nette">Borse nette · NEXUS</button>
       <button class="btn" onclick="caricaAnalytics()">Aggiorna</button></div>
     <div class="da-tela">${intestazioneHtml('da-int', false)}
       <div class="da-riga r1">
@@ -1622,7 +1622,7 @@ function disegnaAnalytics() {
   // ultimo aggiornamento: l'ultima riga inserita o modificata
   $('#da-ultimo').textContent = t.ultimo ? new Date(t.ultimo).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(',', '') : '—';
   const b = d.borse || {};
-  $('#da-borse').innerHTML = borse !== null ? `${fmtN(Math.round(borse))}<small>Borse LV prodotte nel ${esc(d.anno)} · da NEXUS</small>`
+  $('#da-borse').innerHTML = borse !== null ? `${fmtN(Math.round(borse))}<small>Borse nette LV ${esc(d.anno)} · da NEXUS</small>`
     : `—<small>${esc(b.messaggio || 'Borse prodotte non disponibili')}</small>`;
   // tabella responsabilità
   const eb = v => borse ? fmt(v / borse, 2) + ' €' : '—';
@@ -1694,10 +1694,10 @@ function svgBarre(voci) {
 async function impostaBorse() {
   try {
     const p = await api('/api/admin/nexus/borse');
-    modale('Borse prodotte da NEXUS', `<p class="sub" style="margin-top:0">Il totale delle borse LV prodotte serve per €/Borsa e Totale Prodotti: il Worker lo legge
-      direttamente dal database di NEXUS (qualità di oggi + storico), solo in lettura${p.collegato ? '' : ' — <b class="err-txt">ora il database di NEXUS non è collegato al Worker</b>'}.
-      Nella query <code>{ANNO}</code> diventa l'anno scelto.</p>
-      <label class="campo">Query SQL su NEXUS<textarea id="bo-sql" rows="9" style="font:12px/1.45 Consolas,monospace">${esc(p.sql)}</textarea></label>
+    modale('Borse nette da NEXUS', `<p class="sub" style="margin-top:0">Le borse nette LV servono per €/Borsa e Totale Prodotti: il Worker legge direttamente dal database di NEXUS
+      (qualità di oggi + storico), solo in lettura${p.collegato ? '' : ' — <b class="err-txt">ora il database di NEXUS non è collegato al Worker</b>'}.
+      Come in NEXUS, per ogni linea e articolo: netto = OK + BNC − debito BNC dei giorni prima (mai sotto zero). Nella query <code>{ANNO}</code> diventa l'anno scelto.</p>
+      <label class="campo">Query SQL su NEXUS<textarea id="bo-sql" rows="16" style="font:12px/1.45 Consolas,monospace">${esc(p.sql)}</textarea></label>
       <div class="riga-flex" style="margin-top:8px"><button class="btn" onclick="$('#bo-sql').value=S.sqlBorse">Query predefinita</button><span class="sub" id="bo-info"></span></div>`,
       `<button class="btn" onclick="provaBorse()" ${p.collegato ? '' : 'disabled'}>Prova</button><button class="btn prim" onclick="salvaBorse()" ${p.collegato ? '' : 'disabled'}>Salva</button>`, true);
     S.sqlBorse = p.predefinita;
@@ -1707,7 +1707,7 @@ async function provaBorse() {
   $('#bo-info').textContent = 'Leggo NEXUS…';
   try {
     const r = await api('/api/admin/nexus/borse/prova', { method: 'POST', body: { sql: $('#bo-sql').value, anno: S.filtri.da.anno } });
-    $('#bo-info').innerHTML = `<span class="ok-txt">✓ ${r.anno}: ${fmtN(Math.round(r.valore))} borse prodotte</span>`;
+    $('#bo-info').innerHTML = `<span class="ok-txt">✓ ${r.anno}: ${fmtN(Math.round(r.valore))} borse nette</span>`;
   } catch (e) { $('#bo-info').textContent = ''; toast(e.message, 'err'); }
 }
 async function salvaBorse() {
