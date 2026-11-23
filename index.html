@@ -212,6 +212,11 @@ body.con-nuove #toast{bottom:96px}
 .tab-ce tr.ce-princ td.c-ro{background:#d2c4fb!important;color:#3d2b7a}
 .tab-ce tr.ce-princ input,.tab-ce tr.ce-princ select{border-color:#b9a6f5}
 .tab-ce .errato{border:2px solid var(--rosso)!important;background:#fff0f0!important}
+.chip-res{border:1.5px solid var(--bordo);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+.chip-res b{font-weight:700;margin-left:4px}
+.chip-res.att{background:#fcd5b4;border-color:#fb8a3c}
+.badge-manca{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12px;background:#ffe3e3;color:#b3261e;margin:1px 0}
+.badge-manca.deriv{background:#fff1dc;color:#8a5300}
 @keyframes respiro{0%,100%{transform:translateY(-5px)}50%{transform:translateY(-8px)}}
 .pannello{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;border-top:3px solid #111;box-shadow:0 -16px 40px rgba(0,0,0,.22);max-height:50vh;display:flex;flex-direction:column;animation:sali .22s ease-out}
 @keyframes sali{from{transform:translateY(100%)}to{transform:none}}
@@ -2161,6 +2166,67 @@ async function eseguiImportDiba() {
     caricaAna(); if (art && art.nuovo) caricaAnagrafiche();
   } catch (e) { toast(e.message, 'err'); if ($('#db-vai')) $('#db-vai').disabled = false; }
 }
+/* --- Database › Componenti: resoconto dei componenti con campi ancora da compilare --- */
+const RES_CAMPI = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz'], ['cns_area', 'CNS area'], ['sec_taglio', 'sec. Taglio'], ['sec_prep', 'sec. Prep.'], ['sec_ting', 'sec. Ting.'], ['sec_rma', 'sec. RMA'],
+  ['codice_materiale', 'Cod. materiale', 'manca in Distinta base per la tipologia'], ['prezzo', '€', 'manca in Items BC'], ['tdp', 'TDP', 'manca nella tabella TDP']];
+const RES_DEF = ['n_materiale', 'n_pz', 'cns_area', 'sec_taglio', 'sec_prep', 'codice_materiale', 'prezzo', 'tdp'];
+const vuoto = v => v === null || v === undefined || String(v).trim() === '';
+function mancantiCe(c) { // 0 è un valore compilato; gli accessori non hanno CNS né TDP; codice, € e TDP si controllano solo se c'è da dove ricavarli
+  const acc = /ACCESSORIO/i.test(c.n_materiale || ''), m = [];
+  if (vuoto(c.n_materiale)) m.push('n_materiale');
+  if (vuoto(c.n_pz)) m.push('n_pz');
+  if (vuoto(c.cns_area) && !acc) m.push('cns_area');
+  for (const k of ['sec_taglio', 'sec_prep', 'sec_ting', 'sec_rma']) if (vuoto(c[k])) m.push(k);
+  if (!vuoto(c.n_materiale) && vuoto(c.codice_materiale)) m.push('codice_materiale');
+  if (!vuoto(c.codice_materiale) && vuoto(c.prezzo)) m.push('prezzo');
+  if (!vuoto(c.codice_materiale) && vuoto(c.tdp) && !acc) m.push('tdp');
+  return m;
+}
+async function resocontoCe() {
+  try {
+    S.res = S.res || { campi: new Set((store.get('rlv_res_campi') || RES_DEF.join(',')).split(',').filter(Boolean)), q: '' };
+    S.res.righe = (await api('/api/admin/componenti/resoconto')).righe.map(c => ({ ...c, manca: mancantiCe(c) }));
+    modale('Componenti da completare', '<div id="res-corpo"></div>', '<span class="sub" id="res-info"></span><div class="spazio" style="flex:1"></div><button class="btn" onclick="chiudiModale()">Chiudi</button>', true);
+    disegnaResoconto();
+  } catch (e) { toast(e.message, 'err'); }
+}
+function disegnaResoconto() {
+  const r = S.res, box = $('#res-corpo'); if (!box) return;
+  const conta = Object.fromEntries(RES_CAMPI.map(([k]) => [k, r.righe.filter(c => c.manca.includes(k)).length]));
+  const q = r.q.trim().toLowerCase();
+  const lista = r.righe.filter(c => c.manca.some(k => r.campi.has(k)) && (!q || (c.codice_pf + ' ' + c.componente + ' ' + (S.art.get(c.codice_pf) || '')).toLowerCase().includes(q)));
+  const articoli = new Set(lista.map(c => c.codice_pf));
+  box.innerHTML = `<p class="sub" style="margin-top:0">Scegli quali campi controllare. Un valore 0 conta come compilato; agli accessori non servono CNS e TDP.
+      Codice materiale, € e TDP mancano quando non ci sono in Distinta base, Items BC o TDP.</p>
+    <div class="riga-flex" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">${RES_CAMPI.map(([k, t, aiuto]) => `<button class="chip-res ${r.campi.has(k) ? 'att' : ''}" data-k="${k}" title="${esc(aiuto || 'Campo da compilare nel componente')}">${t} <b>${fmtN(conta[k])}</b></button>`).join('')}</div>
+    <input id="res-q" placeholder="Cerca articolo o componente…" value="${esc(r.q)}" style="max-width:340px;margin-bottom:10px" autocomplete="off">
+    <div class="tabwrap" style="max-height:56vh"><table><thead><tr><th class="sx">Articolo</th><th class="sx">Componente</th><th class="sx">Da completare</th><th></th></tr></thead>
+      <tbody>${lista.slice(0, 600).map(c => { const sel = c.manca.filter(k => r.campi.has(k)); return `<tr>
+        <td class="sx"><b>${esc(c.codice_pf)}</b> <span class="sub">${esc(S.art.get(c.codice_pf) || '')}</span></td>
+        <td class="sx">${c.padre ? '<span class="sub">↳ </span>' : ''}${esc(String(c.componente || '').replace(c.codice_pf + '-', ''))}</td>
+        <td class="sx">${sel.map(k => { const d = RES_CAMPI.find(x => x[0] === k); return `<span class="badge-manca ${d[2] ? 'deriv' : ''}" title="${esc(d[2] || 'da compilare nel componente')}">${d[1]}</span>`; }).join(' ')}</td>
+        <td><button class="btn picc" onclick="apriDaResoconto('${esc(c.codice_pf)}', ${c.id}, '${sel.find(k => !RES_CAMPI.find(x => x[0] === k)[2]) || ''}')">Apri</button></td></tr>`; }).join('')
+        || '<tr><td colspan="4" class="vuoto">Nessun componente da completare per i campi scelti 👍</td></tr>'}</tbody></table></div>
+    ${lista.length > 600 ? `<p class="sub">Mostrati i primi 600: usa la ricerca per restringere.</p>` : ''}`;
+  $('#res-info').textContent = `${fmtN(lista.length)} componenti in ${fmtN(articoli.size)} articoli`;
+  $$('#res-corpo .chip-res').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.k; r.campi.has(k) ? r.campi.delete(k) : r.campi.add(k);
+    store.set('rlv_res_campi', [...r.campi].join(',')); disegnaResoconto();
+  }));
+  const qi = $('#res-q'); let t;
+  qi.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { r.q = qi.value; disegnaResoconto(); const n = $('#res-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); });
+}
+// apre l'articolo nell'editor e porta il cursore sul primo campo da compilare del componente
+async function apriDaResoconto(pf, id, campo) {
+  chiudiModale();
+  await apriArticoloDb(pf);
+  if (!S.ce || S.ce.pf !== pf) return;
+  const c = (S.res.righe || []).find(x => x.id === id), r = c && S.ce.righe.find(x => x.id === id || String(x.componente) === String(c.componente));
+  const tr = r && $(`.tab-ce tr[data-uid="${r.uid}"]`); if (!tr) return;
+  tr.classList.add('evidenzia');
+  const el = $(`[data-f="${campo || 'componente'}"]`, tr) || $('[data-f="componente"]', tr);
+  el.scrollIntoView({ block: 'center', inline: 'center' }); el.focus({ preventScroll: true });
+}
 /* --- Database › Componenti: editor per articolo, inserimento veloce, rinforzi collegati --- */
 const CE_CAMPI = ['componente', 'n_materiale', 'n_pz', 'cns_area', 'sec_taglio', 'sec_prep', 'sec_ting', 'sec_rma'];
 const CE_NUM = ['n_pz', 'cns_area', 'sec_taglio', 'sec_prep', 'sec_ting', 'sec_rma'];
@@ -2171,6 +2237,7 @@ function vistaComponentiDb() {
   $('#an-corpo').innerHTML = `<div class="card"><div class="riga-flex" style="align-items:flex-end">
       <label class="campo" style="min-width:280px">Articolo<input id="ce-pf" list="dl-articoli-tutti" placeholder="Codice PF (es. M14019)…" autocomplete="off" value="${esc(S.ce ? S.ce.pf : '')}"></label>
       <button class="btn prim" onclick="apriArticoloDb()">Apri</button>
+      <button class="btn" onclick="resocontoCe()" title="Componenti con campi ancora da compilare">Da completare</button>
       <div class="spazio" style="flex:1"></div>
       <span class="sub" style="max-width:420px">Codice materiale, €, TDP, UM e TM si aggiornano da soli quando cambiano Distinta base, Items BC o TDP.</span></div>
     <p class="sub" style="margin:8px 0 0">Per un articolo nuovo scrivi il codice e premi Apri. I componenti si scrivono direttamente nella tabella: Invio passa alla riga sotto (e ne crea una nuova in fondo), e puoi incollare più righe copiate da Excel.</p></div>
