@@ -212,11 +212,13 @@ body.con-nuove #toast{bottom:96px}
 .tab-ce tr.ce-princ td.c-ro{background:#d2c4fb!important;color:#3d2b7a}
 .tab-ce tr.ce-princ input,.tab-ce tr.ce-princ select{border-color:#b9a6f5}
 .tab-ce .errato{border:2px solid var(--rosso)!important;background:#fff0f0!important}
-.chip-res{border:1.5px solid var(--bordo);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:inherit}
-.chip-res b{font-weight:700;margin-left:4px}
-.chip-res.att{background:#fcd5b4;border-color:#fb8a3c}
-.badge-manca{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12px;background:#ffe3e3;color:#b3261e;margin:1px 0}
-.badge-manca.deriv{background:#fff1dc;color:#8a5300}
+.badge-manca{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12px;background:#ffe3e3;color:#b3261e;white-space:nowrap}
+table.tab-tutti td{padding:6px 10px;font-size:13px}
+table.tab-tutti td.c-manca{background:#ffd9d9!important;box-shadow:inset 0 0 0 1px #f2a3a3}
+table.tab-tutti td.c-manca.d{background:#fff0d6!important;box-shadow:inset 0 0 0 1px #f3c98a}
+table.tab-tutti tr.tt-rinf td{background:#fffaf2}
+.leg-manca{display:inline-block;font-size:12px;padding:2px 9px;border-radius:6px;background:#ffd9d9;box-shadow:inset 0 0 0 1px #f2a3a3}
+.leg-manca.d{background:#fff0d6;box-shadow:inset 0 0 0 1px #f3c98a}
 @keyframes respiro{0%,100%{transform:translateY(-5px)}50%{transform:translateY(-8px)}}
 .pannello{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;border-top:3px solid #111;box-shadow:0 -16px 40px rgba(0,0,0,.22);max-height:50vh;display:flex;flex-direction:column;animation:sali .22s ease-out}
 @keyframes sali{from{transform:translateY(100%)}to{transform:none}}
@@ -305,7 +307,9 @@ body.con-pannello main{padding-bottom:52vh}
 .rs-pz b{position:relative;color:#ff1f1f}
 .rs-barra{position:absolute;right:0;top:20%;height:60%;background:#ffe1e1;border-radius:3px}
 tr.clic{cursor:pointer}
-tr.clic:hover td{background:#f4f8ff}
+tr.clic:hover td{background:#fff3e8}
+.tab-tutti .freccia-rinf{color:#a86400;font-weight:800;margin-right:6px}
+.tab-tutti tr.clic{cursor:pointer}
 @media (max-width:1000px){.rs-griglia{grid-template-columns:1fr}.rs-kpi .rs-kpi-c{flex-basis:90px;padding:4px 12px}.rs-kpi-c b{font-size:22px}}
 /* selezione righe */
 th.c-sel,td.c-sel{width:34px;padding-left:6px;padding-right:6px}
@@ -2166,66 +2170,85 @@ async function eseguiImportDiba() {
     caricaAna(); if (art && art.nuovo) caricaAnagrafiche();
   } catch (e) { toast(e.message, 'err'); if ($('#db-vai')) $('#db-vai').disabled = false; }
 }
-/* --- Database › Componenti: resoconto dei componenti con campi ancora da compilare --- */
-const RES_CAMPI = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz'], ['cns_area', 'CNS area'], ['sec_taglio', 'sec. Taglio'], ['sec_prep', 'sec. Prep.'], ['sec_ting', 'sec. Ting.'], ['sec_rma', 'sec. RMA'],
-  ['codice_materiale', 'Cod. materiale', 'manca in Distinta base per la tipologia'], ['prezzo', '€', 'manca in Items BC'], ['tdp', 'TDP', 'manca nella tabella TDP']];
-const RES_DEF = ['n_materiale', 'n_pz', 'cns_area', 'sec_taglio', 'sec_prep', 'codice_materiale', 'prezzo', 'tdp'];
+/* --- Database › Componenti: tabella completa di tutti gli articoli, con i campi mancanti evidenziati --- */
+// campi da compilare nel componente (rosso) e campi ricavati da Distinta base, Items BC e TDP (giallo).
+// 0 vale come compilato; agli accessori non servono CNS e TDP; sec. Tingitura e sec. RMA vuoti non contano come mancanti.
+const TC_COL = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz', 'n'], ['cns_area', 'CNS area', 'n'], ['sec_taglio', 'sec. Taglio', 'n'], ['sec_prep', 'sec. Prep.', 'n'],
+  ['sec_ting', 'sec. Ting.', 'n'], ['sec_rma', 'sec. RMA', 'n'], ['codice_materiale', 'Cod. materiale'], ['descr_materiale', 'Descrizione materiale'], ['prezzo', '€', 'e'], ['tdp', 'TDP', 'n'], ['tm', 'TM']];
+const DERIVATI = { codice_materiale: 'manca in Distinta base per la tipologia', prezzo: 'manca in Items BC', tdp: 'manca nella tabella TDP' };
 const vuoto = v => v === null || v === undefined || String(v).trim() === '';
-function mancantiCe(c) { // 0 è un valore compilato; gli accessori non hanno CNS né TDP; codice, € e TDP si controllano solo se c'è da dove ricavarli
+function mancantiCe(c) {
   const acc = /ACCESSORIO/i.test(c.n_materiale || ''), m = [];
   if (vuoto(c.n_materiale)) m.push('n_materiale');
   if (vuoto(c.n_pz)) m.push('n_pz');
   if (vuoto(c.cns_area) && !acc) m.push('cns_area');
-  for (const k of ['sec_taglio', 'sec_prep', 'sec_ting', 'sec_rma']) if (vuoto(c[k])) m.push(k);
+  if (vuoto(c.sec_taglio)) m.push('sec_taglio');
+  if (vuoto(c.sec_prep)) m.push('sec_prep');
   if (!vuoto(c.n_materiale) && vuoto(c.codice_materiale)) m.push('codice_materiale');
   if (!vuoto(c.codice_materiale) && vuoto(c.prezzo)) m.push('prezzo');
   if (!vuoto(c.codice_materiale) && vuoto(c.tdp) && !acc) m.push('tdp');
   return m;
 }
-async function resocontoCe() {
-  try {
-    S.res = S.res || { campi: new Set((store.get('rlv_res_campi') || RES_DEF.join(',')).split(',').filter(Boolean)), q: '' };
-    S.res.righe = (await api('/api/admin/componenti/resoconto')).righe.map(c => ({ ...c, manca: mancantiCe(c) }));
-    modale('Componenti da completare', '<div id="res-corpo"></div>', '<span class="sub" id="res-info"></span><div class="spazio" style="flex:1"></div><button class="btn" onclick="chiudiModale()">Chiudi</button>', true);
-    disegnaResoconto();
-  } catch (e) { toast(e.message, 'err'); }
+async function caricaTuttiCe() {
+  S.ct = S.ct || { q: '', vedi: 'tutti', pag: 0 };
+  if ($('#ce-tutti')) $('#ce-tutti').innerHTML = '<div class="card"><p class="sub">Carico i componenti…</p></div>';
+  try { S.ct.righe = (await api('/api/admin/componenti/tutti')).righe.map(c => ({ ...c, manca: mancantiCe(c) })); disegnaTuttiCe(); }
+  catch (e) { toast(e.message, 'err'); }
 }
-function disegnaResoconto() {
-  const r = S.res, box = $('#res-corpo'); if (!box) return;
-  const conta = Object.fromEntries(RES_CAMPI.map(([k]) => [k, r.righe.filter(c => c.manca.includes(k)).length]));
-  const q = r.q.trim().toLowerCase();
-  const lista = r.righe.filter(c => c.manca.some(k => r.campi.has(k)) && (!q || (c.codice_pf + ' ' + c.componente + ' ' + (S.art.get(c.codice_pf) || '')).toLowerCase().includes(q)));
-  const articoli = new Set(lista.map(c => c.codice_pf));
-  box.innerHTML = `<p class="sub" style="margin-top:0">Scegli quali campi controllare. Un valore 0 conta come compilato; agli accessori non servono CNS e TDP.
-      Codice materiale, € e TDP mancano quando non ci sono in Distinta base, Items BC o TDP.</p>
-    <div class="riga-flex" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">${RES_CAMPI.map(([k, t, aiuto]) => `<button class="chip-res ${r.campi.has(k) ? 'att' : ''}" data-k="${k}" title="${esc(aiuto || 'Campo da compilare nel componente')}">${t} <b>${fmtN(conta[k])}</b></button>`).join('')}</div>
-    <input id="res-q" placeholder="Cerca articolo o componente…" value="${esc(r.q)}" style="max-width:340px;margin-bottom:10px" autocomplete="off">
-    <div class="tabwrap" style="max-height:56vh"><table><thead><tr><th class="sx">Articolo</th><th class="sx">Componente</th><th class="sx">Da completare</th><th></th></tr></thead>
-      <tbody>${lista.slice(0, 600).map(c => { const sel = c.manca.filter(k => r.campi.has(k)); return `<tr>
-        <td class="sx"><b>${esc(c.codice_pf)}</b> <span class="sub">${esc(S.art.get(c.codice_pf) || '')}</span></td>
-        <td class="sx">${c.padre ? '<span class="sub">↳ </span>' : ''}${esc(String(c.componente || '').replace(c.codice_pf + '-', ''))}</td>
-        <td class="sx">${sel.map(k => { const d = RES_CAMPI.find(x => x[0] === k); return `<span class="badge-manca ${d[2] ? 'deriv' : ''}" title="${esc(d[2] || 'da compilare nel componente')}">${d[1]}</span>`; }).join(' ')}</td>
-        <td><button class="btn picc" onclick="apriDaResoconto('${esc(c.codice_pf)}', ${c.id}, '${sel.find(k => !RES_CAMPI.find(x => x[0] === k)[2]) || ''}')">Apri</button></td></tr>`; }).join('')
-        || '<tr><td colspan="4" class="vuoto">Nessun componente da completare per i campi scelti 👍</td></tr>'}</tbody></table></div>
-    ${lista.length > 600 ? `<p class="sub">Mostrati i primi 600: usa la ricerca per restringere.</p>` : ''}`;
-  $('#res-info').textContent = `${fmtN(lista.length)} componenti in ${fmtN(articoli.size)} articoli`;
-  $$('#res-corpo .chip-res').forEach(b => b.addEventListener('click', () => {
-    const k = b.dataset.k; r.campi.has(k) ? r.campi.delete(k) : r.campi.add(k);
-    store.set('rlv_res_campi', [...r.campi].join(',')); disegnaResoconto();
-  }));
-  const qi = $('#res-q'); let t;
-  qi.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { r.q = qi.value; disegnaResoconto(); const n = $('#res-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); });
+function disegnaTuttiCe() {
+  const t = S.ct, box = $('#ce-tutti'); if (!box || !t.righe) return;
+  const q = t.q.trim().toLowerCase(), PAG = 300;
+  const tutte = t.righe.filter(c => !q || (c.codice_pf + ' ' + c.componente + ' ' + (S.art.get(c.codice_pf) || '') + ' ' + (c.n_materiale || '') + ' ' + (c.codice_materiale || '')).toLowerCase().includes(q));
+  const lista = tutte.filter(c => t.vedi === 'tutti' || (t.vedi === 'manca' ? c.manca.length : !c.manca.length));
+  const nManca = tutte.filter(c => c.manca.length).length;
+  t.pag = Math.min(t.pag, Math.max(0, Math.ceil(lista.length / PAG) - 1));
+  const pagina = lista.slice(t.pag * PAG, (t.pag + 1) * PAG);
+  const val = (c, k, tipo) => vuoto(c[k]) ? '' : tipo === 'e' ? fmt(c[k], 2) : tipo === 'n' ? fmtN(c[k]) : esc(c[k]);
+  const nome = c => esc(String(c.componente || '').replace(c.codice_pf + '-', ''));
+  box.innerHTML = `<div class="card"><div class="riga-flex">
+      <input id="ct-q" placeholder="Cerca articolo, componente, materiale…" value="${esc(t.q)}" style="max-width:340px" autocomplete="off">
+      <div class="pillole" id="ct-vedi">${[['tutti', `Tutti ${fmtN(tutte.length)}`], ['manca', `Da completare ${fmtN(nManca)}`], ['ok', `Completi ${fmtN(tutte.length - nManca)}`]].map(([k, l]) => `<button data-v="${k}" class="${t.vedi === k ? 'att' : ''}">${l}</button>`).join('')}</div>
+      <span class="sub">${fmtN(new Set(lista.map(c => c.codice_pf)).size)} articoli</span><div class="spazio" style="flex:1"></div>
+      <span class="leg-manca">da compilare</span><span class="leg-manca d">manca in Distinta / Items BC / TDP</span></div>
+    <p class="sub" style="margin:8px 0 0">0 vale come compilato; agli accessori non servono CNS e TDP; sec. Ting. e sec. RMA vuoti non contano come mancanti. Clic su una riga: si apre l'articolo sul campo da compilare.</p></div>
+    <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}">${l}</th>`).join('')}<th>Stato</th></tr></thead>
+      <tbody>${pagina.map(c => `<tr class="clic ${c.padre ? 'tt-rinf' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
+        <td><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
+        <td>${c.padre ? '<span class="freccia-rinf">↳</span>' : ''}${nome(c)}</td><td class="sub">${c.padre ? esc(String(c.padre).replace(c.codice_pf + '-', '')) : ''}</td>
+        ${TC_COL.map(([k, , tipo]) => `<td class="${tipo === 'e' ? 'n ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${DERIVATI[k] && c.manca.includes(k) ? `title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
+        <td>${c.manca.length ? `<span class="badge-manca">${c.manca.length} da completare</span>` : '<span class="ok-txt">✓ completo</span>'}</td></tr>`).join('')
+        || `<tr><td colspan="${TC_COL.length + 4}" class="vuoto">Nessun componente</td></tr>`}</tbody></table></div>
+    ${lista.length > PAG ? `<div class="riga-flex" style="justify-content:center;margin:10px">
+      ${t.pag > 0 ? '<button class="btn" onclick="S.ct.pag--;disegnaTuttiCe()">← Precedenti</button>' : ''}
+      <span class="sub">${fmtN(t.pag * PAG + 1)}-${fmtN(Math.min(lista.length, (t.pag + 1) * PAG))} di ${fmtN(lista.length)}</span>
+      ${(t.pag + 1) * PAG < lista.length ? '<button class="btn" onclick="S.ct.pag++;disegnaTuttiCe()">Successivi →</button>' : ''}</div>` : ''}`;
+  $$('#ct-vedi button').forEach(b => b.addEventListener('click', () => { t.vedi = b.dataset.v; t.pag = 0; disegnaTuttiCe(); }));
+  const qi = $('#ct-q'); let tm;
+  qi.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { t.q = qi.value; t.pag = 0; disegnaTuttiCe(); const n = $('#ct-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); });
+  $('#ce-tutti tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) apriDaTutti(tr.dataset.pf, Number(tr.dataset.id)); });
 }
-// apre l'articolo nell'editor e porta il cursore sul primo campo da compilare del componente
-async function apriDaResoconto(pf, id, campo) {
-  chiudiModale();
+// dalla tabella completa all'editor dell'articolo, col cursore sul primo campo da compilare del componente
+async function apriDaTutti(pf, id) {
+  const c = (S.ct.righe || []).find(x => x.id === id);
+  modoCe('articolo');
   await apriArticoloDb(pf);
-  if (!S.ce || S.ce.pf !== pf) return;
-  const c = (S.res.righe || []).find(x => x.id === id), r = c && S.ce.righe.find(x => x.id === id || String(x.componente) === String(c.componente));
+  if (!S.ce || S.ce.pf !== pf || !c) return;
+  const r = S.ce.righe.find(x => x.id === id || String(x.componente) === String(c.componente));
   const tr = r && $(`.tab-ce tr[data-uid="${r.uid}"]`); if (!tr) return;
   tr.classList.add('evidenzia');
-  const el = $(`[data-f="${campo || 'componente'}"]`, tr) || $('[data-f="componente"]', tr);
+  const campo = c.manca.find(k => !DERIVATI[k]) || 'componente';
+  const el = $(`[data-f="${campo}"]`, tr) || $('[data-f="componente"]', tr);
   el.scrollIntoView({ block: 'center', inline: 'center' }); el.focus({ preventScroll: true });
+}
+function modoCe(m) {
+  S.ceModo = m;
+  $$('#ce-modo button').forEach(b => b.classList.toggle('att', b.dataset.m === m));
+  $('#ce-art').classList.toggle('nascosto', m !== 'articolo');
+  $('#ce-out').classList.toggle('nascosto', m !== 'articolo');
+  $('#ce-aiuto').classList.toggle('nascosto', m !== 'articolo');
+  $('#ce-tutti').classList.toggle('nascosto', m !== 'tutti');
+  if ($('#db-fab')) $('#db-fab').classList.toggle('nascosto', m !== 'articolo');
+  if (m === 'tutti') caricaTuttiCe();
 }
 /* --- Database › Componenti: editor per articolo, inserimento veloce, rinforzi collegati --- */
 const CE_CAMPI = ['componente', 'n_materiale', 'n_pz', 'cns_area', 'sec_taglio', 'sec_prep', 'sec_ting', 'sec_rma'];
@@ -2235,13 +2258,14 @@ const TIPOLOGIE_BASE = ['MATERIALE#1', 'MATERIALE#2', 'MATERIALE#3', 'MATERIALE#
 let ceUid = 0;
 function vistaComponentiDb() {
   $('#an-corpo').innerHTML = `<div class="card"><div class="riga-flex" style="align-items:flex-end">
+      <div class="pillole" id="ce-modo" style="align-self:flex-end;margin-bottom:2px"><button data-m="articolo">Per articolo</button><button data-m="tutti">Tutti i componenti</button></div>
+      <div class="riga-flex" id="ce-art" style="align-items:flex-end">
       <label class="campo" style="min-width:280px">Articolo<input id="ce-pf" list="dl-articoli-tutti" placeholder="Codice PF (es. M14019)…" autocomplete="off" value="${esc(S.ce ? S.ce.pf : '')}"></label>
-      <button class="btn prim" onclick="apriArticoloDb()">Apri</button>
-      <button class="btn" onclick="resocontoCe()" title="Componenti con campi ancora da compilare">Da completare</button>
+      <button class="btn prim" onclick="apriArticoloDb()">Apri</button></div>
       <div class="spazio" style="flex:1"></div>
       <span class="sub" style="max-width:420px">Codice materiale, €, TDP, UM e TM si aggiornano da soli quando cambiano Distinta base, Items BC o TDP.</span></div>
-    <p class="sub" style="margin:8px 0 0">Per un articolo nuovo scrivi il codice e premi Apri. I componenti si scrivono direttamente nella tabella: Invio passa alla riga sotto (e ne crea una nuova in fondo), e puoi incollare più righe copiate da Excel.</p></div>
-    <div id="ce-out"></div>`;
+    <p class="sub" id="ce-aiuto" style="margin:8px 0 0">Per un articolo nuovo scrivi il codice e premi Apri. I componenti si scrivono direttamente nella tabella: Invio passa alla riga sotto (e ne crea una nuova in fondo), e puoi incollare più righe copiate da Excel.</p></div>
+    <div id="ce-out"></div><div id="ce-tutti" class="nascosto"></div>`;
   let dl = $('#dl-articoli-tutti');
   if (!dl) { dl = document.createElement('datalist'); dl.id = 'dl-articoli-tutti'; document.body.appendChild(dl); }
   dl.innerHTML = [...S.art.entries()].map(([k, v]) => `<option value="${esc(k + ' — ' + (v || ''))}">`).join('');
@@ -2249,7 +2273,9 @@ function vistaComponentiDb() {
   $('#ce-pf').addEventListener('change', () => { if (S.art.has(codiceDaArt($('#ce-pf').value))) apriArticoloDb(); });
   fabDb('Aggiungi un componente', () => S.ce ? aggiungiCe() : toast('Apri prima un articolo', 'err'));
   $('#db-fab').classList.add('su'); // sopra la barra "Salva articolo"
+  $$('#ce-modo button').forEach(b => b.addEventListener('click', () => modoCe(b.dataset.m)));
   if (S.ce) disegnaCe();
+  modoCe(S.ceModo || 'articolo');
 }
 function fabDb(titolo, azione) {
   const v = $('#vista'); if (!v) return;
@@ -2451,7 +2477,7 @@ function confermaIncollaCe() {
   S.ce.righe = ordinaCe(S.ce.righe.concat(nuove));
   S.ce.modificato = true; chiudiModale(); disegnaCe(); toast(`Aggiunte ${fmtN(nuove.length)} righe`, 'ok');
 }
-async function salvaCe() {
+async function salvaCe() { // (la tabella "Tutti i componenti" si ricarica quando la si riapre)
   const c = S.ce;
   c.descr = $('#ce-descr').value.trim();
   const usate = c.righe.filter(r => String(r.componente).trim() || r.id);
