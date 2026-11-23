@@ -126,23 +126,6 @@ table.foglio:not(.tab-ce) th.ord{padding-left:30px;padding-right:30px}
 table.foglio:not(.tab-ce) th.ord .freccia{position:absolute;right:7px;top:50%;transform:translateY(-50%);margin:0}
 table.foglio:not(.tab-ce) td input,table.foglio:not(.tab-ce) td select{text-align:center;text-align-last:center}
 table.foglio th.h-desc{color:#433dff}
-/* Inserimento Dati: tutta la tabella in una pagina, il più stretta possibile */
-table.foglio.tab-ins{font-size:12px;table-layout:fixed;width:100%}
-table.foglio.tab-ins td,table.foglio.tab-ins th{overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
-table.foglio.tab-ins td{overflow:hidden}
-table.foglio.tab-ins .badge-nuova{white-space:nowrap;font-size:9px}
-table.foglio.tab-ins tr.riga-nuova input,table.foglio.tab-ins tr.riga-nuova select{width:100%!important;min-width:0;box-sizing:border-box}
-table.foglio.tab-ins input[type=date]{padding:3px 1px;font-size:11.5px}
-table.foglio.tab-ins input[type=date]::-webkit-calendar-picker-indicator{margin:0;padding:0;width:12px}
-table.foglio.tab-ins th{font-size:11px;padding:4px 14px 4px 4px;white-space:normal;line-height:1.15}
-table.foglio.tab-ins th.ord{padding-left:4px;padding-right:14px}
-table.foglio.tab-ins th.ord .freccia{right:2px;font-size:7px}
-table.foglio.tab-ins td{padding:2px 4px;height:28px;white-space:normal;line-height:1.2}
-table.foglio.tab-ins td.c-num{min-width:0}
-table.foglio.tab-ins td.c-elab{min-width:0}
-table.foglio.tab-ins td.c-note{max-width:none}
-table.foglio.tab-ins td[data-k="data"],table.foglio.tab-ins td[data-k="minuti"],table.foglio.tab-ins td[data-k="totale_eur"],table.foglio.tab-ins td[data-k="pz_ko"]{white-space:nowrap}
-table.foglio.tab-ins .badge{white-space:normal;font-size:10.5px;line-height:1.15;padding:1px 6px}
 table.foglio th.h-pz{background:#fff;color:#ff0000;box-shadow:inset 0 0 0 2px #ff0000}
 table.foglio td.c-num{background:#d9d9d9;text-align:center;min-width:90px}
 table.foglio td.c-scheda{background:#d9d9d9}
@@ -178,8 +161,8 @@ tr.riga-3d td{position:relative;z-index:2;transform:translateY(-5px);padding-top
 tr.riga-3d td:first-child{border-left:6px solid #111}
 tr.riga-3d td:last-child{border-right:2px solid #111}
 tr.spazio-3d td{height:14px;padding:0;border:0!important;background:transparent}
-tr.riga-nuova td{padding:3px 3px;vertical-align:middle}
-tr.riga-nuova input,tr.riga-nuova select{background:rgba(255,255,255,.92);border:1px solid #9c9c9c;border-radius:5px;padding:3px 4px;font-size:12px;font-family:inherit;color:#000}
+tr.riga-nuova td{padding:6px 6px;vertical-align:middle}
+tr.riga-nuova input,tr.riga-nuova select{background:rgba(255,255,255,.92);border:1px solid #9c9c9c;border-radius:6px;padding:6px 7px;font-size:13px;font-family:inherit;color:#000}
 tr.riga-nuova td.c-elab select{background:#666;color:#7cff7c;font-weight:700;border-color:#8a8a8a}
 tr.riga-nuova td.c-elab.no select{background:#ffd4f8;color:#000;font-weight:400}
 tr.riga-nuova td.c-desc,tr.riga-nuova td.c-tl input{font-style:italic}
@@ -765,9 +748,6 @@ async function aggiornaContaElabora() {
    ===================================================================== */
 function opzioni(lista, sel, vuota = '—') { return `<option value="">${vuota}</option>` + lista.map(x => `<option ${x === sel ? 'selected' : ''}>${esc(x)}</option>`).join(''); }
 function codiceDaArt(v) { return String(v || '').split('—')[0].trim().toUpperCase(); }
-// larghezza delle colonne di Inserimento Dati (in proporzione): la tabella sta tutta nella pagina
-const PESI_INS = { scheda: 5, numero: 4.5, stato_elab: 4.8, data: 7.5, bollettino: 4.2, conceria: 4.6, team_leader: 5.2, sku: 4.8, componente: 8, descrizione: 7, pz_ko: 3.4,
-  motivazione: 8, responsabilita: 7, operatore: 5.2, materiale: 5.4, note: 5, minuti: 4, totale_eur: 4.6, stato: 6.4 };
 const COL_FOGLIO = [['numero', 'Codice Richiesta'], ['stato_elab', 'Stato Elaborazione'], ['data', 'Data'], ['bollettino', 'Bollettino'], ['conceria', 'Conceria'], ['team_leader', 'Team Leader'],
   ['sku', 'SKU'], ['componente', 'Componente'], ['descrizione', 'Descrizione'], ['pz_ko', 'Pz KO'], ['motivazione', 'Motivazione'], ['responsabilita', 'Responsabilità'], ['operatore', 'Operatore'],
   ['materiale', 'Materiale Richiesto'], ['note', 'Note'], ['minuti', 'Minuti', 'n'], ['totale_eur', 'Totale €', 'n'], ['stato', 'Stato Richiesta']];
@@ -953,19 +933,19 @@ function cellaNuova(n, k) {
     case 'numero': return '<span class="badge-nuova">NUOVA</span>';
     case 'stato_elab': return isMag() ? `<select data-f="stato_elab">${['Si', 'Non Richiedere'].map(x => `<option ${n.stato_elab === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`
       : `<span title="Gestito dal magazzino">${esc(n.stato_elab || 'Si')}</span>`;
-    case 'data': return `<input type="date" data-f="data" value="${esc(n.data)}" max="${giorniFa(-7)}" style="width:116px">`;
-    case 'bollettino': return `<input data-f="bollettino" value="${esc(n.bollettino)}" style="width:62px">`;
-    case 'conceria': return `<select data-f="conceria" style="width:84px">${opzioni(S.ana.concerie, n.conceria)}</select>`;
-    case 'team_leader': return `<input data-f="team_leader" list="dl-operatori" value="${esc(n.team_leader)}" style="width:108px">`;
-    case 'componente': return `<select data-f="componente" style="width:150px" ${comps.length ? '' : 'disabled'}>${opzioniComponenti(comps.length ? n.sku : '', n.componente)}</select>`;
-    case 'sku': return `<input data-f="sku" list="dl-articoli" value="${esc(n.sku)}" placeholder="Articolo" autocomplete="off" style="width:78px">`;
+    case 'data': return `<input type="date" data-f="data" value="${esc(n.data)}" max="${giorniFa(-7)}" style="width:142px">`;
+    case 'bollettino': return `<input data-f="bollettino" value="${esc(n.bollettino)}" style="width:96px">`;
+    case 'conceria': return `<select data-f="conceria" style="width:112px">${opzioni(S.ana.concerie, n.conceria)}</select>`;
+    case 'team_leader': return `<input data-f="team_leader" list="dl-operatori" value="${esc(n.team_leader)}" style="width:165px">`;
+    case 'componente': return `<select data-f="componente" style="width:235px" ${comps.length ? '' : 'disabled'}>${opzioniComponenti(comps.length ? n.sku : '', n.componente)}</select>`;
+    case 'sku': return `<input data-f="sku" list="dl-articoli" value="${esc(n.sku)}" placeholder="Articolo" autocomplete="off" style="width:112px">`;
     case 'descrizione': return esc(S.art.get(n.sku) || '');
-    case 'pz_ko': return `<input data-f="pz_ko" type="number" min="1" step="1" inputmode="numeric" value="${esc(n.pz_ko)}" style="width:46px;text-align:center">`;
-    case 'motivazione': return `<input data-f="motivazione" list="dl-motivazioni" value="${esc(n.motivazione)}" placeholder="Motivazione" style="width:150px">`;
+    case 'pz_ko': return `<input data-f="pz_ko" type="number" min="1" step="1" inputmode="numeric" value="${esc(n.pz_ko)}" style="width:72px;text-align:center">`;
+    case 'motivazione': return `<input data-f="motivazione" list="dl-motivazioni" value="${esc(n.motivazione)}" placeholder="Motivazione" style="width:245px">`;
     case 'responsabilita': { const m = S.mot.get(String(n.motivazione || '').trim()); return esc(m ? m.resp || '' : ''); }
-    case 'operatore': return `<input data-f="operatore" list="dl-operatori" value="${esc(n.operatore)}" style="width:108px">`;
-    case 'materiale': return `<select data-f="materiale" style="width:94px">${opzioni(S.ana.materiali, n.materiale)}</select>`;
-    case 'note': return `<input data-f="note" value="${esc(n.note)}" style="width:100px">`;
+    case 'operatore': return `<input data-f="operatore" list="dl-operatori" value="${esc(n.operatore)}" style="width:165px">`;
+    case 'materiale': return `<select data-f="materiale" style="width:132px">${opzioni(S.ana.materiali, n.materiale)}</select>`;
+    case 'note': return `<input data-f="note" value="${esc(n.note)}" style="width:165px">`;
     case 'minuti': case 'totale_eur': return '<span class="sub">…</span>';
     case 'stato': return badgeStato(pseudoRiga(n).stato_calc);
     case 'scheda': return esc(S.nuoveScheda);
@@ -1117,8 +1097,7 @@ function disegnaRighe() {
   const corpo = righe.map((r, i) => rigaHtml(r, i, cols, S.form && S.form.cont === '#pannello' && S.form.id === r.id ? 'id="riga-edit" class="riga-3d"' : '')).join('');
   const vuota = !righe.length && !nuova;
   const freccia = k => f.ord === k ? `<span class="freccia">${f.dir === 'asc' ? '▲' : '▼'}</span>` : '<span class="freccia spenta">▲▼</span>';
-  const tot = cols.reduce((a, c) => a + (PESI_INS[c[0]] || 5), 0) + 2.5, larg = k => ((k ? PESI_INS[k] || 5 : 2.5) / tot * 100).toFixed(2) + '%';
-  $('#r-tab').innerHTML = `<div class="tabwrap tab-alta"><table class="foglio tab-ins"><thead><tr>${cols.map(c => `<th class="ord ${c[2] === 'n' ? 'n ' : ''}${classeTh(c[0])}" style="width:${larg(c[0])}" onclick="ordina('${c[0]}')" title="Ordina">${c[1]}${freccia(c[0])}</th>`).join('')}<th style="width:${larg('')}"></th></tr></thead>
+  $('#r-tab').innerHTML = `<div class="tabwrap tab-alta"><table class="foglio"><thead><tr>${cols.map(c => `<th class="ord ${c[2] === 'n' ? 'n ' : ''}${classeTh(c[0])}" onclick="ordina('${c[0]}')" title="Ordina">${c[1]}${freccia(c[0])}</th>`).join('')}<th></th></tr></thead>
     <tbody>${vuota ? `<tr><td colspan="${cols.length + 1}" class="vuoto">${puoAggiungere() ? 'Nessuna riga in questo periodo. Premi <b>+</b> per aggiungerne una.' : 'Nessuna riga. Scegli una scheda per aggiungere righe.'}</td></tr>`
       : (f.dir === 'asc' ? corpo + segnaposto + spazio : spazio + segnaposto + corpo)}</tbody></table></div>
     ${righe.length < t.n ? `<div style="text-align:center;margin:12px"><button class="btn" onclick="cercaRighe(true)">Carica altre ${fmtN(Math.min(500, t.n - righe.length))}</button></div>` : ''}
