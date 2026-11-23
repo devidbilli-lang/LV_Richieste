@@ -918,7 +918,8 @@ function eventiNuove() {
   let clic = 0, prima = null;
   const posX = (w, el) => { const r = el.getBoundingClientRect(), o = w.getBoundingClientRect().left + w.clientLeft - w.scrollLeft; return [r.left - o, r.right - o]; };
   // clic su una cella tagliata a metà: la tabella scorre subito (prima che si apra l'elenco) e riparte dalla cella accanto
-  tb.addEventListener('mousedown', e => {
+  // pointerdown (non mousedown): arriva anche dai menu disattivati, es. Componente quando manca lo SKU
+  tb.addEventListener('pointerdown', e => {
     clic = Date.now();
     const td = e.target.closest('tr.riga-nuova td, #riga-edit td'), w = $('#r-tab .tabwrap');
     if (!td || !w || w.scrollWidth <= w.clientWidth) return;
