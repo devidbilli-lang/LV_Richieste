@@ -1938,8 +1938,70 @@ function vistaAnagrafiche() {
   S.selAna = new Set();
   fabDb(`Aggiungi a ${TAB[t].t}`, () => editAna(null));
   if (t === 'items_bc') pannelloPbi();
+  if (t === 'tdp') pannelloTdp();
   $('#an-q').addEventListener('keydown', e => { if (e.key === 'Enter') caricaAna(); });
   caricaAna();
+}
+/* --- Database › TDP: dal file Excel su Teams ogni notte --- */
+async function pannelloTdp() {
+  try {
+    const p = await api('/api/admin/tdp-teams');
+    if (!$('#an-imp')) return;
+    S.tt = p; disegnaTdp();
+  } catch (e) { if ($('#an-imp')) $('#an-imp').innerHTML = `<div class="card"><p class="sub">TDP da Teams: ${esc(e.message)}</p></div>`; }
+}
+function disegnaTdp() {
+  const p = S.tt, u = p.ultimo || {}, imp = p.impostazioni;
+  const ultimo = !u.quando ? 'mai eseguito' : u.esito === 'ok'
+    ? `<span class="ok-txt">✓ ${dtIt(u.quando)}</span> · ${esc(u.file || '')}${u.foglio ? ' › ' + esc(u.foglio) : ''} · ${fmtN(u.letti)} codici letti · ${fmtN(u.nuovi)} nuovi · ${fmtN(u.aggiornati)} cambiati${u.origine === 'manuale' ? ' (a mano)' : ''}`
+    : `<span class="err-txt">✕ ${dtIt(u.quando)} · ${esc(u.messaggio || 'errore')}</span>`;
+  $('#an-imp').innerHTML = `<div class="card pbi">
+    <div class="riga-flex" style="justify-content:space-between"><h2 style="margin:0">TDP dal file Excel su Teams · aggiornamento ogni notte</h2>
+      <span class="sub">Ultimo aggiornamento: ${ultimo}</span></div>
+    <div class="riga-flex" style="margin:10px 0">
+      <span>Microsoft: ${p.collegato ? `<b class="ok-txt">collegato</b>${p.account ? ' come <b>' + esc(p.account) + '</b>' : ''}` : '<b class="err-txt">non collegato</b>'}</span>
+      <button class="btn" onclick="ricollegaMsTdp()" ${p.configurato ? '' : 'disabled'}>${p.collegato ? 'Ricollega Microsoft' : 'Collega Microsoft'}</button>
+      <span class="sub">Lo stesso collegamento dei prezzi Power BI: la prima volta va ricollegato per dare anche il permesso di leggere i file di Teams.</span></div>
+    <div class="griglia" style="grid-template-columns:minmax(0,3fr) repeat(3,minmax(0,1fr))">
+      <label class="campo">Link del file Excel su Teams (Copia collegamento)<input id="tt-link" value="${esc(imp.link)}" placeholder="https://…sharepoint.com/…"></label>
+      <label class="campo">Foglio<input id="tt-foglio" value="${esc(imp.foglio)}" placeholder="il primo"></label>
+      <label class="campo">Colonna Codice<input id="tt-cod" value="${esc(imp.col_codice)}" placeholder="es. L o CODICE"></label>
+      <label class="campo">Colonna TDP<input id="tt-tdp" value="${esc(imp.col_tdp)}" placeholder="es. M o TDP"></label></div>
+    <div class="riga-flex" style="margin-top:10px"><button class="btn" onclick="provaTdp()" ${p.collegato ? '' : 'disabled'}>Prova</button>
+      <button class="btn prim" onclick="salvaTdpTeams()">Salva impostazioni</button>
+      <button class="btn" onclick="aggiornaTdpTeams()" ${p.collegato ? '' : 'disabled'}>Aggiorna adesso</button><span class="sub" id="tt-info"></span></div>
+    <div id="tt-anteprima"></div>
+    <p class="sub" style="margin:10px 0 0">Ogni notte il Worker legge il file: aggiunge i codici nuovi, aggiorna i TDP cambiati e li riporta sui componenti che usano quei materiali.
+      I codici che nel file non ci sono restano. Il TDP si legge in frazione (0,45); se nel file è scritto 45 diventa 0,45. Le righe già inserite tengono il loro Totale €.</p></div>`;
+}
+const leggiTdpForm = () => ({ link: $('#tt-link').value.trim(), foglio: $('#tt-foglio').value.trim(), col_codice: $('#tt-cod').value.trim(), col_tdp: $('#tt-tdp').value.trim() });
+async function ricollegaMsTdp() {
+  try { const r = await api('/api/admin/pbi/collega', { method: 'POST' }); window.open(r.url, 'ms-login', 'width=520,height=680'); toast('Accedi con Microsoft nella finestra e accetta, poi premi Prova', 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function provaTdp() {
+  const f = leggiTdpForm(); S.tt.impostazioni = f;
+  $('#tt-info').textContent = 'Leggo il file su Teams…';
+  try {
+    const r = await api('/api/admin/tdp-teams/prova', { method: 'POST', body: f });
+    $('#tt-info').innerHTML = `<span class="ok-txt">✓ ${esc(r.file)} › ${esc(r.foglio)}: ${fmtN(r.totale)} codici con TDP</span>${r.fogli.length > 1 ? ` · fogli: ${esc(r.fogli.join(', '))}` : ''}`;
+    $('#tt-anteprima').innerHTML = `<div class="tabwrap" style="max-height:240px;margin-top:10px;max-width:420px"><table><thead><tr><th>Codice</th><th class="n">TDP</th></tr></thead>
+      <tbody>${r.righe.map(x => `<tr><td>${esc(x.codice)}</td><td class="n">${fmt(x.tdp, 2)}</td></tr>`).join('')}</tbody></table></div>`;
+  } catch (e) { $('#tt-info').textContent = ''; toast(e.message, 'err'); }
+}
+async function salvaTdpTeams() {
+  try { await api('/api/admin/tdp-teams', { method: 'PUT', body: leggiTdpForm() }); toast('Impostazioni salvate: il TDP si aggiorna ogni notte', 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function aggiornaTdpTeams() {
+  try {
+    await api('/api/admin/tdp-teams', { method: 'PUT', body: leggiTdpForm() });
+    toast('Aggiorno il TDP da Teams…', 'ok');
+    const r = await api('/api/admin/tdp-teams/aggiorna', { method: 'POST' });
+    if (r.esito !== 'ok') throw new Error(r.messaggio || 'Aggiornamento non riuscito');
+    toast(`TDP: ${fmtN(r.nuovi)} nuovi, ${fmtN(r.aggiornati)} cambiati`, 'ok');
+    S.tt.ultimo = r; S.tt.impostazioni = leggiTdpForm(); disegnaTdp(); caricaAna(S.filtri.anaOff || 0, { mantieni: true }); caricaAnagrafiche();
+  } catch (e) { toast(e.message, 'err'); pannelloTdp(); }
 }
 /* --- Database › Items BC: prezzi da Power BI ogni notte --- */
 const CAMPI_PBI = [['codice', 'Codice *', /\b(no|codice|item|articolo)\b/i], ['prezzo', 'Prezzo *', /prezz|price|cost/i], ['descrizione', 'Descrizione', /descr/i],
