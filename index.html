@@ -308,6 +308,8 @@ tr.sel td{background:#fff4d6!important}
   background:linear-gradient(rgba(255,255,255,.74),rgba(255,255,255,.74)),var(--mod-sfondo,none) center/cover,#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .mod-strumenti{display:flex;justify-content:flex-end;gap:8px;margin:-4px 0 8px}
 .mod-strumenti label.btn{cursor:pointer}
+.btn-stampa{display:inline-flex;align-items:center;gap:7px}
+.btn-stampa svg{width:18px;height:18px;flex:0 0 auto}
 .mod-tela .intestazione{margin-bottom:12px}
 .mod-griglia{display:grid;grid-template-columns:minmax(0,61fr) minmax(0,23.5fr) minmax(0,14.5fr);grid-template-rows:128px 168px minmax(320px,1fr);gap:9px;padding:0 4px;min-height:calc(100vh - 290px)}
 .mod-pan{background:#fff;border:2px solid var(--mod-blu);border-radius:9px;position:relative;min-width:0}
@@ -356,8 +358,17 @@ tr.sel td{background:#fff4d6!important}
   header,nav,.no-print,#toast{display:none!important}
   body,html{background:#fff}
   main{padding:0;max-width:none}
-  .mod-tela{border-radius:0}
-  .mod-griglia{min-height:0;grid-template-rows:118px 150px auto}
+  .fab,#db-fab{display:none!important}
+  .mod-tela{border-radius:0;padding-top:0}
+  .mod-griglia{min-height:0;grid-template-columns:minmax(0,61fr) minmax(0,23.5fr) minmax(0,14.5fr)!important;grid-template-rows:auto auto 1fr!important;min-height:166mm!important}
+  .mod-tab{grid-column:auto!important;grid-row:1 / 4!important;overflow:visible}
+  .mod-mat{grid-column:2 / 4!important}
+  .mod-sku,.mod-rep,.mod-kpi,.mod-num{min-height:0!important}
+  .mod-sku{min-height:28mm!important}.mod-kpi{min-height:36mm!important}
+  .mod-descr,.mod-mat-riga span:last-child{white-space:normal;overflow:visible}
+  .mod-kpi-gr b{font-size:24px}
+  .mod-rep select{-webkit-appearance:none;appearance:none}
+  .mod-num input{border-bottom-color:transparent!important;caret-color:transparent}
   .card{border:0;box-shadow:none;padding:0}
   @page{size:A4 landscape;margin:12mm}
 }
@@ -1472,12 +1483,21 @@ async function eliminaRichiesta(id) {
 const REPARTI_MODULO = ['Pelle', 'Fodere', 'Infustiture', 'Tessuto'];
 const COL_MODULO = [['componente', 'Componente'], ['pz', 'Pz KO'], ['min_taglio', 'Minuti<br>Taglio'], ['min_prep', 'Minuti<br>Preparazione'], ['min_ting', 'Minuti<br>Tingitura'], ['min_rma', 'Minuti<br>RMA']];
 S.sfondo = store.get('rlv_sfondo') || null;
+const ICONA_STAMPA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="2.5" y="9" width="19" height="8" rx="2"/><path d="M6 14h12v7H6z"/><circle cx="18" cy="12" r=".6" fill="currentColor"/></svg>';
+function stampaModulo() {
+  const m = S.cache.modulo;
+  if (!m) return toast('Scrivi prima il N° richiesta', 'err');
+  const titolo = document.title; // diventa il nome del file se si salva in PDF
+  document.title = ['Modulo', m.numero, m.sku].filter(Boolean).join('_').replace(/[\\/:*?"<>|]+/g, '-');
+  window.addEventListener('afterprint', () => { document.title = titolo; }, { once: true });
+  window.print();
+}
 function vistaModulo() {
   S.filtri.modOrd = S.filtri.modOrd || { k: 'pz', dir: 'desc' };
   S.filtri.modRep = S.filtri.modRep || REPARTI_MODULO[0];
   S.cache.modulo = null;
   $('#vista').innerHTML = `<div class="mod-strumenti no-print">${isAdmin() ? `<label class="btn" title="Immagine di sfondo del modulo">${S.sfondo ? 'Cambia sfondo' : 'Carica sfondo'}<input type="file" accept="image/*" hidden onchange="caricaSfondo(this.files[0])"></label>` : ''}
-      <button class="btn" onclick="window.print()">Stampa</button></div>
+      <button class="btn btn-stampa" onclick="stampaModulo()" title="Stampa il modulo (A4 orizzontale)">${ICONA_STAMPA}Stampa</button></div>
     <div class="mod-tela" id="mod-tela">
     ${intestazioneHtml('mo-int', false)}
     <div class="mod-griglia">
