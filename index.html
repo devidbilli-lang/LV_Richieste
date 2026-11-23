@@ -168,6 +168,11 @@ tr.riga-nuova td.c-elab.no select{background:#ffd4f8;color:#000;font-weight:400}
 tr.riga-nuova td.c-desc,tr.riga-nuova td.c-tl input{font-style:italic}
 tr.riga-nuova select:disabled{opacity:.55}
 tr.riga-nuova .errato{border:2px solid var(--rosso)!important;background:#fff0f0!important}
+tr.riga-nuova td{position:relative}
+.replica{position:absolute;top:2px;right:2px;z-index:2;display:none;width:20px;height:20px;border-radius:50%;border:1.5px solid #fb8a3c;background:#fff;color:#e0701f;font-size:12px;font-weight:700;line-height:16px;padding:0;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.replica:hover{background:#fb8a3c;color:#fff}
+tr.riga-nuova td:hover .replica,tr.riga-nuova td:focus-within .replica{display:block}
+@media (hover:none){tr.riga-nuova td:focus-within .replica{display:block;width:26px;height:26px;line-height:22px}}
 .badge-nuova{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;letter-spacing:.04em}
 body.con-nuove .fab{bottom:96px}
 body.con-nuove #toast{bottom:96px}
@@ -927,7 +932,14 @@ function mancanti(n) {
   return m;
 }
 const NOMI_CAMPI = { data: 'data', sku: 'SKU', componente: 'componente', pz_ko: 'Pz KO', motivazione: 'motivazione', operatore: 'operatore (non in elenco)', team_leader: 'team leader (non in elenco)' };
+// righe nuove: ogni valore si può copiare su tutte le altre righe nuove (⇊), e una riga si può duplicare (⧉)
+const CAMPI_REPLICA = ['stato_elab', 'data', 'bollettino', 'conceria', 'team_leader', 'sku', 'componente', 'pz_ko', 'motivazione', 'operatore', 'materiale', 'note'];
 function cellaNuova(n, k) {
+  const rep = S.nuove.length > 1 && CAMPI_REPLICA.includes(k) && (k !== 'stato_elab' || isMag())
+    ? `<button type="button" class="replica" data-rep="${k}" tabindex="-1" title="Copia questo valore su tutte le righe nuove">⇊</button>` : '';
+  return cellaNuovaBase(n, k) + rep;
+}
+function cellaNuovaBase(n, k) {
   const comps = S.compPerPf.get(n.sku) || [];
   switch (k) {
     case 'numero': return '<span class="badge-nuova">NUOVA</span>';
@@ -955,7 +967,30 @@ function cellaNuova(n, k) {
 function rigaNuovaHtml(n, j, cols) {
   const r = pseudoRiga(n);
   return `<tr class="riga-3d riga-nuova" data-n="${j}">${cols.map(c => `<td data-k="${c[0]}" class="${c[2] === 'n' ? 'n ' : ''}${classeCella(c[0], r)}">${cellaNuova(n, c[0])}</td>`).join('')}
-    <td><button class="icona" title="Togli questa riga" onclick="togliNuova(${j})">✕</button></td></tr>`;
+    <td style="white-space:nowrap"><button class="icona" title="Duplica questa riga con tutti i valori" onclick="duplicaNuova(${j})">⧉</button><button class="icona" title="Togli questa riga" onclick="togliNuova(${j})">✕</button></td></tr>`;
+}
+function ridisegnaNuoveFermo() { // ridisegna le righe senza perdere la posizione nella tabella
+  const w0 = $('#r-tab .tabwrap'), pos = w0 ? [w0.scrollTop, w0.scrollLeft, window.scrollY] : null;
+  disegnaRighe();
+  const w = $('#r-tab .tabwrap'); if (pos && w) { w.scrollTop = pos[0]; w.scrollLeft = pos[1]; window.scrollTo(0, pos[2]); }
+}
+function replicaCampo(j, f) {
+  const src = S.nuove[j]; if (!src) return;
+  let fatte = 0, saltate = 0;
+  S.nuove.forEach((x, i) => {
+    if (i === j) return;
+    if (f === 'componente' && x.sku !== src.sku) { saltate++; return; } // il componente vale solo per lo stesso articolo
+    x[f] = src[f]; fatte++;
+    if (f === 'sku' && !String(x.componente || '').startsWith(src.sku + '-')) x.componente = '';
+  });
+  salvaNuoveLocale(); ridisegnaNuoveFermo(); aggiornaBarraNuove();
+  toast(`Copiato su ${fatte} ${fatte === 1 ? 'riga' : 'righe'}${saltate ? ` (${saltate} con un altro SKU saltate)` : ''}`, 'ok');
+}
+function duplicaNuova(j) {
+  const n = S.nuove[j]; if (!n) return;
+  S.nuove.splice(j + 1, 0, { ...n });
+  salvaNuoveLocale(); ridisegnaNuoveFermo(); aggiornaBarraNuove();
+  const tr = $(`#r-tab tr.riga-nuova[data-n="${j + 1}"]`); if (tr) tr.classList.add('evidenzia');
 }
 function aggiornaCelleNuova(tr, n) { // colori, descrizione, responsabilità, stato senza ridisegnare gli input
   const r = pseudoRiga(n);
@@ -984,6 +1019,10 @@ function eventiNuove() {
     salvaNuoveLocale(); aggiornaBarraNuove();
   };
   tb.addEventListener('input', agg); tb.addEventListener('change', agg);
+  // ⇊ copia il valore della cella su tutte le righe nuove (senza togliere il cursore dal campo)
+  const ferma = e => { if (e.target.closest('.replica')) e.preventDefault(); };
+  tb.addEventListener('pointerdown', ferma, true); tb.addEventListener('mousedown', ferma, true);
+  tb.addEventListener('click', e => { const b = e.target.closest('.replica'); if (b) replicaCampo(Number(b.closest('tr').dataset.n), b.dataset.rep); });
   scorrimentoOrizzontale(tb, () => $('#r-tab .tabwrap'), 'tr.riga-nuova td, #riga-edit td');
 }
 // Scorrimento orizzontale "a pagine" per le tabelle in cui si scrive (Inserimento Dati, Database › Componenti):
