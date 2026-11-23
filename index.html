@@ -199,6 +199,10 @@ body.con-nuove #toast{bottom:96px}
 .tab-ce tr.ce-mod td:first-child{box-shadow:inset 4px 0 0 #f0a500}
 .tab-ce tr.ce-nuova td{background:#f3fdfe}
 .tab-ce tr.ce-nuova td:first-child{box-shadow:inset 5px 0 0 #111}
+/* componente principale con rinforzi: riga viola fino a TM (le celle calcolate un tono più scuro) */
+.tab-ce tr.ce-princ td:not(:last-child){background:#e3d9ff}
+.tab-ce tr.ce-princ td.c-ro{background:#d2c4fb!important;color:#3d2b7a}
+.tab-ce tr.ce-princ input,.tab-ce tr.ce-princ select{border-color:#b9a6f5}
 .tab-ce .errato{border:2px solid var(--rosso)!important;background:#fff0f0!important}
 @keyframes respiro{0%,100%{transform:translateY(-5px)}50%{transform:translateY(-8px)}}
 .pannello{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;border-top:3px solid #111;box-shadow:0 -16px 40px rgba(0,0,0,.22);max-height:50vh;display:flex;flex-direction:column;animation:sali .22s ease-out}
@@ -951,16 +955,20 @@ function eventiNuove() {
     salvaNuoveLocale(); aggiornaBarraNuove();
   };
   tb.addEventListener('input', agg); tb.addEventListener('change', agg);
-  // Tab / Maiusc+Tab: la tabella resta ferma finché la cella è visibile; appena si supera l'ultima cella visibile
-  // lo scorrimento riparte da lì (la cella appena compilata diventa la prima a sinistra) fino alla fine del foglio
+  scorrimentoOrizzontale(tb, () => $('#r-tab .tabwrap'), 'tr.riga-nuova td, #riga-edit td');
+}
+// Scorrimento orizzontale "a pagine" per le tabelle in cui si scrive (Inserimento Dati, Database › Componenti):
+// con Tab / Maiusc+Tab la tabella resta ferma finché la cella è visibile; appena si supera l'ultima cella visibile
+// lo scorrimento riparte da lì (la cella appena compilata diventa la prima a sinistra) fino alla fine del foglio.
+// Clic su una cella tagliata a metà: la tabella scorre subito (prima che si apra l'elenco) e riparte dalla cella accanto.
+function scorrimentoOrizzontale(tb, wrap, celle) {
   let clic = 0, prima = null;
   const posX = (w, el) => { const r = el.getBoundingClientRect(), o = w.getBoundingClientRect().left + w.clientLeft - w.scrollLeft; return [r.left - o, r.right - o]; };
-  // clic su una cella tagliata a metà: la tabella scorre subito (prima che si apra l'elenco) e riparte dalla cella accanto
   // pointerdown (non mousedown): arriva anche dai menu disattivati, es. Componente quando manca lo SKU
   tb.addEventListener('pointerdown', e => {
     clic = Date.now();
-    const td = e.target.closest('tr.riga-nuova td, #riga-edit td'), w = $('#r-tab .tabwrap');
-    if (!td || !w || w.scrollWidth <= w.clientWidth) return;
+    const td = e.target.closest(celle), w = wrap();
+    if (!td || !w || !tb.contains(td) || w.scrollWidth <= w.clientWidth) return;
     const vw = w.clientWidth, sl = w.scrollLeft, [a, b] = posX(w, td);
     let dest = sl;
     if (b > sl + vw) { const v = td.previousElementSibling && posX(w, td.previousElementSibling); dest = v && b - v[0] <= vw ? v[0] : a; }
@@ -970,13 +978,13 @@ function eventiNuove() {
   }, true);
   tb.addEventListener('keydown', e => {
     if (e.key !== 'Tab') return;
-    const w = $('#r-tab .tabwrap'); if (w) prima = { sl: w.scrollLeft, td: e.target.closest('td') };
+    const w = wrap(); if (w) prima = { sl: w.scrollLeft, td: e.target.closest('td') };
   }, true);
   tb.addEventListener('focusin', e => {
     const p = prima; prima = null;
     if (Date.now() - clic < 400) return; // con il mouse la cella è già sotto gli occhi
-    const td = e.target.closest('tr.riga-nuova td, #riga-edit td'), w = $('#r-tab .tabwrap');
-    if (!td || !w || w.scrollWidth <= w.clientWidth) return;
+    const td = e.target.closest(celle), w = wrap();
+    if (!td || !w || !tb.contains(td) || w.scrollWidth <= w.clientWidth) return;
     const pos = el => posX(w, el);
     const vw = w.clientWidth, sl = p ? p.sl : w.scrollLeft, [a, b] = pos(td);
     const prec = p && p.td && p.td !== td && p.td.isConnected && tb.contains(p.td) ? pos(p.td) : null;
@@ -2194,7 +2202,7 @@ function disegnaCe() {
     <div class="tabwrap tab-alta"><table class="foglio tab-ce"><thead><tr>
       <th class="c-sel"><input type="checkbox" id="ce-tutti" title="Seleziona tutte le righe"></th><th>#</th><th>Componente</th><th>Rinforzo di</th><th>#Materiale</th><th>N° pz</th><th>CNS area</th><th>sec. Taglio</th><th>sec. Prep.</th><th>sec. Ting.</th><th>sec. RMA</th>
       <th class="c-ro" title="Si aggiorna da solo: non si modifica">Cod. materiale</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">Descrizione materiale</th><th class="n c-ro" title="Si aggiorna da solo: non si modifica">€</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">TM</th><th></th></tr></thead>
-    <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : ''} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
+    <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : nRinf(r.uid) ? 'ce-princ' : ''} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
       <td class="c-sel"><input type="checkbox" data-sel="${r.uid}" ${c.sel && c.sel.has(r.uid) ? 'checked' : ''}></td>
       <td class="sub c-centro">${i + 1}</td>
       <td class="ce-nome">${r.padreUid ? '<span class="freccia-rinf">↳</span>' : ''}<input data-f="componente" value="${esc(r.componente)}" style="width:${r.padreUid ? 210 : 236}px" placeholder="${r.padreUid ? 'Nome rinforzo' : 'Nome componente'}"></td>
@@ -2253,6 +2261,7 @@ function disegnaCe() {
     });
     segna(); disegnaCe(); toast('Righe incollate', 'ok');
   });
+  scorrimentoOrizzontale(tb, () => $('#ce-out .tabwrap'), 'td');
   aggiornaStatoCe(); aggiornaSelCe();
   const w = $('#ce-out .tabwrap');
   if (pos && w) { w.scrollTop = pos.t; w.scrollLeft = pos.l; window.scrollTo(0, pos.y); }
