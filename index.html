@@ -913,6 +913,17 @@ function eventiNuove() {
     salvaNuoveLocale(); aggiornaBarraNuove();
   };
   tb.addEventListener('input', agg); tb.addEventListener('change', agg);
+  // passando di cella con Tab / Maiusc+Tab la tabella scorre da sola e tiene la cella attiva al centro
+  let clic = 0;
+  tb.addEventListener('mousedown', () => { clic = Date.now(); });
+  tb.addEventListener('focusin', e => {
+    if (Date.now() - clic < 400) return; // con il mouse la cella è già sotto gli occhi
+    const td = e.target.closest('tr.riga-nuova td, #riga-edit td'), w = $('#r-tab .tabwrap');
+    if (!td || !w || w.scrollWidth <= w.clientWidth) return;
+    const wr = w.getBoundingClientRect(), r = td.getBoundingClientRect();
+    const sx = r.left - wr.left + w.scrollLeft - (w.clientWidth - r.width) / 2;
+    w.scrollTo({ left: Math.max(0, Math.min(sx, w.scrollWidth - w.clientWidth)), behavior: 'smooth' });
+  });
 }
 function aggiornaBarraNuove() {
   const b = $('#barra-nuove'); if (!b) return;
