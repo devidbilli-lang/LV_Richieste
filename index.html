@@ -353,7 +353,7 @@ tr.sel td{background:#fff4d6!important}
 #da-tip{position:fixed;z-index:60;pointer-events:none;background:#fff;border:1px solid var(--bordo);border-radius:8px;padding:6px 9px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.14);display:none;white-space:nowrap}
 @media (max-width:1100px){.da-riga.r1,.da-riga.r2{grid-template-columns:1fr;height:auto}.da-pan{min-height:320px}.da-scroll{max-height:440px}.da-svg>svg{height:auto;max-height:380px}}
 /* modulo (come il report) */
-.mod-tela{--mod-blu:#5b5bff;--mod-lav:#dfdefb;--mod-lav2:#ebeafd;position:relative;border-radius:var(--r);padding:12px 0 10px;
+.mod-tela{--mod-blu:#fb8a3c;--mod-lav:#fcd5b4;--mod-lav2:#fde9d9; /* arancione come Data Analytics */position:relative;border-radius:var(--r);padding:12px 0 10px;
   background:linear-gradient(rgba(255,255,255,.74),rgba(255,255,255,.74)),var(--mod-sfondo,none) center/cover,#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .mod-strumenti{display:flex;justify-content:flex-end;gap:8px;margin:-4px 0 8px}
 .mod-strumenti label.btn{cursor:pointer}
@@ -378,16 +378,16 @@ tr.sel td{background:#fff4d6!important}
 .mod-kpi-gr span{font-size:12.5px}
 .mod-num{display:flex;flex-direction:column;padding:12px 10px}
 .mod-num input{flex:1;width:100%;border:0;border-bottom:2px dashed transparent;background:transparent;text-align:center;font:800 58px/1 "Montserrat",sans-serif;padding:0;min-width:0;outline:none;color:#000;border-radius:0;cursor:text}
-.mod-num input:hover,.mod-num input:focus{border-bottom-color:#c9c9f5}
+.mod-num input:hover,.mod-num input:focus{border-bottom-color:#f9c49b}
 .mod-num input::-webkit-calendar-picker-indicator{display:none!important;opacity:0}
 .mod-mat{grid-column:2 / 4;padding:8px 10px}
 .mod-mat h3{text-align:center;font-weight:500;font-size:24px;margin:2px 0 12px}
-.mod-mat-riga{position:relative;display:flex;align-items:center;gap:14px;border:1.5px solid #8f8fff;background:#f3f3ff;border-radius:2px;padding:8px 10px 8px 26px;margin-bottom:9px;font-size:14.5px}
+.mod-mat-riga{position:relative;display:flex;align-items:center;gap:14px;border:1.5px solid #f9b07c;background:#fff3e8;border-radius:2px;padding:8px 10px 8px 26px;margin-bottom:9px;font-size:14.5px}
 .mod-mat-riga .mod-barra{left:6px;top:6px;height:calc(100% - 12px)}
 .mod-mat-riga b{font-weight:500;white-space:nowrap}
 .mod-mat-riga span:last-child{flex:1;min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mod-tabella{width:100%;border-collapse:collapse;font-size:15px;border-bottom:2px solid var(--mod-blu)}
-.mod-tabella th{position:static;background:#fcd5b4;color:#222;font-style:normal;font-weight:500;font-size:15px;text-align:center;padding:8px 8px 10px;border:0;border-bottom:2px solid #fb8a3c;white-space:normal;line-height:1.25;cursor:pointer;vertical-align:top}
+.mod-tabella th{position:static;background:var(--mod-lav);color:#222;font-style:normal;font-weight:500;font-size:15px;text-align:center;padding:8px 8px 10px;border:0;border-bottom:2px solid var(--mod-blu);white-space:normal;line-height:1.25;cursor:pointer;vertical-align:top}
 .mod-tabella td{text-align:center;padding:1px 8px;line-height:1.25;border:0;white-space:nowrap}
 .mod-tabella .sx{text-align:left}
 .mod-tabella th.sx{text-align:center}
