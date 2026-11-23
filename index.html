@@ -2242,7 +2242,7 @@ function mancantiCe(c) {
   }
   if (!vuoto(c.n_materiale) && vuoto(c.codice_materiale)) m.push('codice_materiale');
   if (!vuoto(c.codice_materiale) && vuoto(c.prezzo)) m.push('prezzo');
-  if (!vuoto(c.codice_materiale) && vuoto(c.tdp) && !acc) m.push('tdp');
+  if (!vuoto(c.codice_materiale) && vuoto(c.tdp) && !acc && !inf) m.push('tdp'); // infustiture e accessori: il TDP non si segnala
   return m;
 }
 async function caricaTuttiCe() {
@@ -2270,7 +2270,7 @@ function disegnaTuttiCe() {
       <div class="pillole" id="ct-vedi">${[['tutti', `Tutti ${fmtN(tutte.length)}`], ['manca', `Da completare ${fmtN(nManca)}`], ['ok', `Completi ${fmtN(tutte.length - nManca)}`]].map(([k, l]) => `<button data-v="${k}" class="${t.vedi === k ? 'att' : ''}">${l}</button>`).join('')}</div>
       <span class="sub">${fmtN(new Set(lista.map(c => c.codice_pf)).size)} articoli</span><div class="spazio" style="flex:1"></div>
       <span class="leg-manca">da compilare</span><span class="leg-manca d">manca in Distinta / Items BC / TDP</span></div>
-    <p class="sub" style="margin:8px 0 0">0 vale come compilato; gli accessori non hanno lavorazioni, quindi non hanno celle rosse né TDP; le infustiture sono rosse solo se manca il tempo di taglio; sec. Ting. e sec. RMA vuoti non contano come mancanti. Clic su una riga: si apre l'articolo sul campo da compilare.</p></div>
+    <p class="sub" style="margin:8px 0 0">0 vale come compilato; gli accessori non hanno lavorazioni, quindi non hanno celle rosse; le infustiture sono rosse solo se manca il tempo di taglio; il TDP non si segnala per infustiture e accessori; sec. Ting. e sec. RMA vuoti non contano come mancanti. Clic su una riga: si apre l'articolo sul campo da compilare.</p></div>
     <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}">${l}</th>`).join('')}<th>Stato</th></tr></thead>
       <tbody>${pagina.map(c => `<tr class="clic ${c.padre ? 'tt-rinf' : c.princ ? 'tt-princ' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
         <td class="c-art"><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
