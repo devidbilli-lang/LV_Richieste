@@ -637,7 +637,8 @@ function respProfilo() { return S.profilo && S.profilo.ruolo === 'scheda' ? ({ p
 function voci() {
   const r = S.profilo.ruolo;
   const v = [];
-  v.push(['foglio', r === 'scheda' ? S.profilo.nome : 'Inserimento Dati']); // ogni linea vede il proprio nome
+  // admin: tutto · magazzino: Da elaborare, Avanzamento, Modulo · linea: solo il proprio foglio (col suo nome)
+  if (r !== 'magazzino') v.push(['foglio', r === 'scheda' ? S.profilo.nome : 'Inserimento Dati']);
   if (r !== 'scheda') { v.push(['elabora', 'Da elaborare']); v.push(['avanzamento', 'Avanzamento']); v.push(['modulo', 'Modulo']); }
   if (r === 'admin' || respProfilo()) v.push(['responsabilita', r === 'scheda' ? 'Riepilogo ' + respProfilo() : 'Responsabilità']); // il magazzino non la vede
   if (r === 'admin') { v.push(['anagrafiche', 'Database']); v.push(['profili', 'Profili']); v.push(['import', 'Importa']); }
