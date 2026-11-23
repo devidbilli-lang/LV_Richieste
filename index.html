@@ -173,13 +173,13 @@ body.con-nuove .fab{bottom:96px}
 body.con-nuove #toast{bottom:96px}
 .filtri{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .filtro-sel{width:auto;border:3px solid var(--ciano);border-radius:999px;padding:6px 12px;font-size:13px;background:#fff}
-.filtro-sel.att{background:#111;color:#fff;border-color:#111}
+.filtro-sel.att{background:#fb8a3c;color:#fff;border-color:#fb8a3c}
 .filtro-cerca input{width:220px;border:3px solid var(--ciano);border-radius:999px;padding:6px 14px 6px 32px;font-size:13px;
   background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%23888' stroke-width='2'%3E%3Ccircle cx='6' cy='6' r='4.5'/%3E%3Cpath d='m9.5 9.5 3.5 3.5'/%3E%3C/svg%3E") no-repeat 12px center}
 .pillole{display:inline-flex;border:3px solid var(--ciano);border-radius:999px;overflow:hidden;background:#fff}
 .pillole button{border:0;background:transparent;padding:6px 12px;font-size:13px;cursor:pointer;color:var(--tenue);font-weight:500}
 .pillole button+button{border-left:3px solid var(--ciano)}
-.pillole button.att{background:#111;color:#fff}
+.pillole button.att{background:#fb8a3c;color:#fff;font-weight:600}
 .testata{border:1px solid var(--bordo);border-bottom:0;border-radius:var(--r) var(--r) 0 0;padding:16px 0 12px;background:#fff;overflow:hidden}
 .intestazione{display:flex;align-items:center;gap:4px}
 .seg{flex:1 1 0;min-width:12px;height:5px;background:#000}
@@ -2207,12 +2207,12 @@ function mancantiCe(c) {
 }
 async function caricaTuttiCe() {
   S.ct = S.ct || { q: '', vedi: 'tutti', pag: 0 };
-  if ($('#ce-tutti')) $('#ce-tutti').innerHTML = '<div class="card"><p class="sub">Carico i componenti…</p></div>';
+  if ($('#ce-elenco')) $('#ce-elenco').innerHTML = '<div class="card"><p class="sub">Carico i componenti…</p></div>';
   try { S.ct.righe = (await api('/api/admin/componenti/tutti')).righe.map(c => ({ ...c, manca: mancantiCe(c) })); disegnaTuttiCe(); }
   catch (e) { toast(e.message, 'err'); }
 }
 function disegnaTuttiCe() {
-  const t = S.ct, box = $('#ce-tutti'); if (!box || !t.righe) return;
+  const t = S.ct, box = $('#ce-elenco'); if (!box || !t.righe) return;
   const q = t.q.trim().toLowerCase(), PAG = 300;
   const tutte = t.righe.filter(c => !q || (c.codice_pf + ' ' + c.componente + ' ' + (S.art.get(c.codice_pf) || '') + ' ' + (c.n_materiale || '') + ' ' + (c.codice_materiale || '')).toLowerCase().includes(q));
   const lista = tutte.filter(c => t.vedi === 'tutti' || (t.vedi === 'manca' ? c.manca.length : !c.manca.length));
@@ -2241,7 +2241,7 @@ function disegnaTuttiCe() {
   $$('#ct-vedi button').forEach(b => b.addEventListener('click', () => { t.vedi = b.dataset.v; t.pag = 0; disegnaTuttiCe(); }));
   const qi = $('#ct-q'); let tm;
   qi.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { t.q = qi.value; t.pag = 0; disegnaTuttiCe(); const n = $('#ct-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); });
-  $('#ce-tutti tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) apriDaTutti(tr.dataset.pf, Number(tr.dataset.id)); });
+  $('#ce-elenco tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) apriDaTutti(tr.dataset.pf, Number(tr.dataset.id)); });
 }
 // dalla tabella completa all'editor dell'articolo, col cursore sul primo campo da compilare del componente
 async function apriDaTutti(pf, id) {
@@ -2262,7 +2262,7 @@ function modoCe(m) {
   $('#ce-art').classList.toggle('nascosto', m !== 'articolo');
   $('#ce-out').classList.toggle('nascosto', m !== 'articolo');
   $('#ce-aiuto').classList.toggle('nascosto', m !== 'articolo');
-  $('#ce-tutti').classList.toggle('nascosto', m !== 'tutti');
+  $('#ce-elenco').classList.toggle('nascosto', m !== 'tutti'); // (id diverso dalla casella «seleziona tutte» dell'editor, #ce-tutti)
   if ($('#db-fab')) $('#db-fab').classList.toggle('nascosto', m !== 'articolo');
   if (m === 'tutti') caricaTuttiCe();
 }
@@ -2281,7 +2281,7 @@ function vistaComponentiDb() {
       <div class="spazio" style="flex:1"></div>
       <span class="sub" style="max-width:420px">Codice materiale, €, TDP, UM e TM si aggiornano da soli quando cambiano Distinta base, Items BC o TDP.</span></div>
     <p class="sub" id="ce-aiuto" style="margin:8px 0 0">Per un articolo nuovo scrivi il codice e premi Apri. I componenti si scrivono direttamente nella tabella: Invio passa alla riga sotto (e ne crea una nuova in fondo), e puoi incollare più righe copiate da Excel.</p></div>
-    <div id="ce-out"></div><div id="ce-tutti" class="nascosto"></div>`;
+    <div id="ce-out"></div><div id="ce-elenco" class="nascosto"></div>`;
   let dl = $('#dl-articoli-tutti');
   if (!dl) { dl = document.createElement('datalist'); dl.id = 'dl-articoli-tutti'; document.body.appendChild(dl); }
   dl.innerHTML = [...S.art.entries()].map(([k, v]) => `<option value="${esc(k + ' — ' + (v || ''))}">`).join('');
