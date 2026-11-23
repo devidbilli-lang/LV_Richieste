@@ -12,8 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --viola:#111111; --viola-2:#000000; --viola-chiaro:#e6fafc;
-  --ciano:#d4f7fa; --ciano-bordo:#9fe3ea; --ciano-scuro:#1497a6;
+  --viola:#111111; --viola-2:#000000; --viola-chiaro:#fff0e3;
+  --ciano:#fcd5b4; --ciano-bordo:#fb8a3c; --ciano-scuro:#e0701f; /* intestazioni e filtri arancioni */
   --blu:#5b4ff2; --grigio-cella:#e3e3e3; --grigio-scuro:#5f6064; --verde-acceso:#5df25d;
   --testo:#111111; --tenue:#6b6b6b; --bordo:#dcdcdc; --sfondo:#ffffff; --carta:#ffffff;
   --verde:#1e9e4a; --verde-chiaro:#e2f6e8; --ambra:#a86400; --ambra-chiaro:#fff2dc; --rosso:#e53935; --rosso-chiaro:#fde8e8;
@@ -37,16 +37,14 @@ header{position:sticky;top:0;z-index:20;background:#fff;color:var(--testo);borde
 .chip{background:var(--grigio-chiaro);border:1px solid var(--bordo);border-radius:999px;padding:4px 10px;font-size:13px;white-space:nowrap}
 .btn-header{background:#fff;border:1px solid var(--bordo);color:var(--testo);border-radius:8px;padding:5px 10px;cursor:pointer}
 .btn-header:hover{border-color:var(--testo)}
-/* linguette: Inserimento Dati arancione (come Data Analytics), le altre celesti fino a Database, da Database a Importa grigio scuro */
+/* linguette arancioni (come Data Analytics); Database, Profili e Importa grigio scuro */
 nav{display:flex;gap:5px;padding:8px 8px 0;overflow-x:auto;align-items:flex-end}
 nav button{border:1.5px solid;border-bottom:0;border-radius:10px 10px 0 0;padding:7px 16px 7px;cursor:pointer;white-space:nowrap;font-weight:600;color:#1f1f1f;transition:padding .12s,filter .12s}
 nav button:hover{filter:brightness(.95)}
 nav button.t-arancio{background:#fcd5b4;border-color:#fb8a3c}
-nav button.t-celeste{background:#d4f7fa;border-color:#9fe3ea}
 nav button.t-grigio{background:#555;border-color:#3a3a3a;color:#fff}
 nav button.att{padding-top:11px;font-weight:700;box-shadow:0 -3px 8px rgba(0,0,0,.1)}
 nav button.t-arancio.att{background:#fb8a3c;color:#fff}
-nav button.t-celeste.att{background:#6fd3df;border-color:#3fbfcd;color:#0d3a40}
 nav button.t-grigio.att{background:#1f1f1f;border-color:#1f1f1f}
 nav .conta{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--rosso);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
 
@@ -60,7 +58,7 @@ main{max-width:none;margin:0;padding:10px 6px}
 label.campo{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--tenue);font-weight:600}
 label.campo.largo{grid-column:span 2}
 input,select,textarea{border:1px solid var(--bordo);background:#fff;border-radius:8px;padding:7px 9px;min-width:0;width:100%}
-input:focus,select:focus,textarea:focus{outline:2px solid rgba(20,151,166,.25);border-color:var(--ciano-scuro)}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(251,138,60,.3);border-color:var(--ciano-scuro)}
 input[readonly]{background:var(--grigio-chiaro);color:var(--tenue)}
 input.errato{border-color:var(--rosso);background:var(--rosso-chiaro)}
 .btn{border:1px solid var(--bordo);background:#fff;border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:600;white-space:nowrap}
@@ -82,8 +80,11 @@ th{position:sticky;top:0;background:var(--ciano);font-size:13px;color:var(--test
 td.n,th.n{text-align:center}
 td input,td select,td textarea{text-align:center;text-align-last:center}
 td.wrap{white-space:normal;min-width:160px}
-tbody tr:hover{background:#f7fdfe}
+tbody tr:hover{background:#fff8f2}
 tfoot td{font-weight:700;background:var(--ciano);position:sticky;bottom:0}
+body.sez-grigia table th{background:#dcdcdc;border-bottom-color:#8c8c8c}
+body.sez-grigia table th.ord:hover{background:#cfcfcf}
+body.sez-grigia table tfoot td,body.sez-grigia .gruppo-testa{background:#dcdcdc}
 .tab-alta{max-height:calc(100vh - 250px)}
 .vuoto{padding:30px;text-align:center;color:var(--tenue)}
 
@@ -100,7 +101,7 @@ tfoot td{font-weight:700;background:var(--ciano);position:sticky;bottom:0}
 
 /* nuova richiesta */
 .tab-comp td{padding:4px 4px}
-.tab-comp tr.on{background:#effbfc}
+.tab-comp tr.on{background:#fff3e8}
 .tab-comp tr.on td:first-child{box-shadow:inset 3px 0 0 var(--viola)}
 .tab-comp input,.tab-comp select{padding:5px 7px}
 .tab-comp .pz{width:72px;text-align:center}
@@ -117,7 +118,7 @@ tfoot td{font-weight:700;background:var(--ciano);position:sticky;bottom:0}
 @media (prefers-reduced-motion:reduce){.fab{animation:none}}
 /* tabella come il foglio Google (stessi colori e formattazioni condizionali) */
 table.foglio{font-family:"Montserrat",sans-serif;font-size:14px}
-table.foglio th{background:#dcfffd;color:#000;font-style:italic;font-weight:400;font-size:14px;text-align:center;padding:9px 12px;border:1px dotted #b8b8b8;border-bottom:2px solid #b8d8d6}
+table.foglio th{background:var(--ciano);color:#000;font-style:italic;font-weight:400;font-size:14px;text-align:center;padding:9px 12px;border:1px dotted #d9a77f;border-bottom:2px solid var(--ciano-bordo)}
 table.foglio td{padding:8px 12px;height:38px;border:1px dotted #c6c6c6;color:#000}
 /* foglio: tutti i valori e le intestazioni centrati (le frecce di ordinamento non spostano il titolo) */
 table.foglio:not(.tab-ce) th,table.foglio:not(.tab-ce) td{text-align:center}
@@ -149,10 +150,10 @@ table.foglio td.c-note{max-width:240px;overflow:hidden;text-overflow:ellipsis;wh
 table.foglio tbody tr{cursor:default}
 th{z-index:3}
 th.ord{cursor:pointer;user-select:none}
-th.ord:hover{background:#bfeff4}
+th.ord:hover{background:#f9c49b}
 .freccia{font-style:normal;font:9px/1 Arial,Helvetica,sans-serif;margin-left:5px;color:var(--testo)}
 .freccia.spenta{opacity:.25}
-.riga-3d td{background-color:#f3fdfe}
+.riga-3d td{background-color:#fff6ef}
 tr.riga-3d td{position:relative;z-index:2;transform:translateY(-5px);padding-top:12px;padding-bottom:12px;
   border-top:2px solid #111!important;border-bottom:2px solid #111!important;
   background-image:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,0) 65%);
@@ -204,7 +205,7 @@ body.con-nuove #toast{bottom:96px}
 .tab-ce tr.ce-rinf td.ce-nome{padding-left:22px}
 .tab-ce .freccia-rinf{color:#a86400;font-weight:800;margin-right:6px}
 .tab-ce tr.ce-mod td:first-child{box-shadow:inset 4px 0 0 #f0a500}
-.tab-ce tr.ce-nuova td{background:#f3fdfe}
+.tab-ce tr.ce-nuova td{background:#fff6ef}
 .tab-ce tr.ce-nuova td:first-child{box-shadow:inset 5px 0 0 #111}
 /* componente principale con rinforzi: riga viola fino a TM (le celle calcolate un tono più scuro) */
 .tab-ce tr.ce-princ td:not(:last-child){background:#e3d9ff}
@@ -221,7 +222,7 @@ body.con-nuove #toast{bottom:96px}
 body.con-pannello .fab{display:none}
 body.con-pannello main{padding-bottom:52vh}
 .barra-salva{position:sticky;bottom:0;z-index:5;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border:1px solid var(--bordo);border-radius:var(--r);padding:10px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 -4px 14px rgba(0,0,0,.07)}
-.comuni{background:#f5fdfe;border:1px dashed var(--ciano-bordo);border-radius:8px;padding:10px;margin:10px 0}
+.comuni{background:#fff8f2;border:1px dashed var(--ciano-bordo);border-radius:8px;padding:10px;margin:10px 0}
 
 /* gruppi da elaborare */
 .gruppo{border:1px solid var(--bordo);border-radius:var(--r);margin-bottom:12px;background:#fff;overflow:hidden}
@@ -230,7 +231,7 @@ body.con-pannello main{padding-bottom:52vh}
 
 /* avanzamento */
 .cella-rep{border:1px dashed var(--bordo);background:#fff;border-radius:7px;padding:3px 7px;cursor:pointer;min-width:66px;font-size:12px;text-align:center}
-.cella-rep.data{border-style:solid;border-color:var(--ciano-bordo);background:#f2fcfd}
+.cella-rep.data{border-style:solid;border-color:var(--ciano-bordo);background:#fff6ef}
 .cella-rep.flag{border-color:var(--verde);background:var(--verde-chiaro);color:var(--verde)}
 .cella-rep.ro{cursor:default}
 .pop{position:absolute;z-index:60;background:#fff;border:1px solid var(--bordo);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px;width:240px}
@@ -386,7 +387,7 @@ tr.sel td{background:#fff4d6!important}
 .mod-mat-riga b{font-weight:500;white-space:nowrap}
 .mod-mat-riga span:last-child{flex:1;min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mod-tabella{width:100%;border-collapse:collapse;font-size:15px;border-bottom:2px solid var(--mod-blu)}
-.mod-tabella th{position:static;background:var(--mod-lav);color:#222;font-style:normal;font-weight:500;font-size:15px;text-align:center;padding:8px 8px 10px;border:0;border-bottom:2px solid var(--mod-blu);white-space:normal;line-height:1.25;cursor:pointer;vertical-align:top}
+.mod-tabella th{position:static;background:#fcd5b4;color:#222;font-style:normal;font-weight:500;font-size:15px;text-align:center;padding:8px 8px 10px;border:0;border-bottom:2px solid #fb8a3c;white-space:normal;line-height:1.25;cursor:pointer;vertical-align:top}
 .mod-tabella td{text-align:center;padding:1px 8px;line-height:1.25;border:0;white-space:nowrap}
 .mod-tabella .sx{text-align:left}
 .mod-tabella th.sx{text-align:center}
@@ -697,7 +698,7 @@ function mostraApp() {
   $('#app').innerHTML = `<header><div class="barra"><div class="marchio-app"><small>LV_Richieste</small></div>
     <span class="spazio"></span>
     <span class="chip">${esc(p.nome)}</span><button class="btn-header" onclick="esci()">Esci</button></div>
-    <nav id="nav">${voci().map(([k, t]) => `<button data-v="${k}" class="${k === 'foglio' ? 't-arancio' : ['anagrafiche', 'profili', 'import'].includes(k) ? 't-grigio' : 't-celeste'}" onclick="vai('${k}')">${t}<span class="conta nascosto" id="c-${k}"></span></button>`).join('')}</nav></header>
+    <nav id="nav">${voci().map(([k, t]) => `<button data-v="${k}" class="${['anagrafiche', 'profili', 'import'].includes(k) ? 't-grigio' : 't-arancio'}" onclick="vai('${k}')">${t}<span class="conta nascosto" id="c-${k}"></span></button>`).join('')}</nav></header>
     <main id="vista"></main>`;
   vai(store.get('rlv_vista_' + p.nome) || (p.ruolo === 'magazzino' ? 'elabora' : 'foglio'));
   if (isMag()) aggiornaContaElabora();
@@ -708,6 +709,7 @@ function vai(v) {
   S.form = null;
   S.vista = v; store.set('rlv_vista_' + S.profilo.nome, v);
   $$('#nav button').forEach(b => b.classList.toggle('att', b.dataset.v === v));
+  document.body.classList.toggle('sez-grigia', ['anagrafiche', 'profili', 'import'].includes(v)); // tabelle con intestazione grigia
   chiudiPop();
   const f = { foglio: vistaFoglio, elabora: vistaElabora, avanzamento: vistaAvanzamento, modulo: vistaModulo, responsabilita: vistaResponsabilita, analytics: vistaAnalytics, anagrafiche: vistaAnagrafiche, profili: vistaProfili, import: vistaImport }[v];
   $('#vista').innerHTML = '';
