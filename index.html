@@ -913,16 +913,28 @@ function eventiNuove() {
     salvaNuoveLocale(); aggiornaBarraNuove();
   };
   tb.addEventListener('input', agg); tb.addEventListener('change', agg);
-  // passando di cella con Tab / Maiusc+Tab la tabella scorre da sola e tiene la cella attiva al centro
-  let clic = 0;
+  // Tab / Maiusc+Tab: la tabella resta ferma finché la cella è visibile; appena si supera l'ultima cella visibile
+  // lo scorrimento riparte da lì (la cella appena compilata diventa la prima a sinistra) fino alla fine del foglio
+  let clic = 0, prima = null;
   tb.addEventListener('mousedown', () => { clic = Date.now(); });
+  tb.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    const w = $('#r-tab .tabwrap'); if (w) prima = { sl: w.scrollLeft, td: e.target.closest('td') };
+  }, true);
   tb.addEventListener('focusin', e => {
+    const p = prima; prima = null;
     if (Date.now() - clic < 400) return; // con il mouse la cella è già sotto gli occhi
     const td = e.target.closest('tr.riga-nuova td, #riga-edit td'), w = $('#r-tab .tabwrap');
     if (!td || !w || w.scrollWidth <= w.clientWidth) return;
-    const wr = w.getBoundingClientRect(), r = td.getBoundingClientRect();
-    const sx = r.left - wr.left + w.scrollLeft - (w.clientWidth - r.width) / 2;
-    w.scrollTo({ left: Math.max(0, Math.min(sx, w.scrollWidth - w.clientWidth)), behavior: 'smooth' });
+    const orig = w.getBoundingClientRect().left + w.clientLeft - w.scrollLeft;
+    const pos = el => { const r = el.getBoundingClientRect(); return [r.left - orig, r.right - orig]; };
+    const vw = w.clientWidth, sl = p ? p.sl : w.scrollLeft, [a, b] = pos(td);
+    const prec = p && p.td && p.td !== td && p.td.isConnected && tb.contains(p.td) ? pos(p.td) : null;
+    let dest = sl;
+    if (b > sl + vw) dest = prec && prec[0] < a && b - prec[0] <= vw ? prec[0] : a;              // avanti
+    else if (a < sl) dest = prec && prec[1] > b && prec[1] - a <= vw ? prec[1] - vw : b - vw;    // indietro
+    dest = Math.max(0, Math.min(dest, w.scrollWidth - vw));
+    requestAnimationFrame(() => { w.scrollLeft = sl; if (dest !== sl) w.scrollTo({ left: dest, behavior: 'smooth' }); });
   });
 }
 function aggiornaBarraNuove() {
