@@ -121,6 +121,11 @@ table.foglio th.h-desc{color:#433dff}
 table.foglio th.h-pz{background:#fff;color:#ff0000;box-shadow:inset 0 0 0 2px #ff0000}
 table.foglio td.c-num{background:#d9d9d9;text-align:center;min-width:90px}
 table.foglio td.c-scheda{background:#d9d9d9}
+/* Database: colonne calcolate da non toccare */
+td.c-ro,table.foglio td.c-ro{background:#e6e6e6!important;color:#555}
+th.c-ro{background:#d4d4d4!important}
+tr.evidenzia td{animation:lampo 2.2s ease-out}
+@keyframes lampo{0%,35%{background:#fff3b0}100%{background:inherit}}
 table.foglio td.c-num.chiusa{background:#a2ffa2}
 table.foglio td.c-elab{background:#666;color:#7cff7c;font-weight:700;text-align:center;min-width:150px}
 table.foglio td.c-elab.no{background:#ffd4f8;color:#000;font-weight:400}
@@ -303,6 +308,38 @@ tr.sel td{background:#fff4d6!important}
 .db-conti .si{border-color:#2e9e4f;background:#effaf2}
 .db-conti .si b{color:#1d7a3a}
 @media (max-width:900px){.db-conti{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* data analytics (come il report Power BI) */
+.da-tela{background:#fff;border-radius:var(--r);padding:12px 0 6px}
+.da-tela .intestazione{margin-bottom:12px}
+.da-riga{display:grid;gap:10px;padding:0 4px;margin-bottom:10px}
+.da-riga.r1{grid-template-columns:minmax(0,51fr) minmax(0,26fr) minmax(0,21fr);height:400px}
+.da-riga.r2{grid-template-columns:minmax(0,37fr) minmax(0,32fr) minmax(0,29fr);height:420px}
+.da-pan{border:3px solid #fb8a3c;border-radius:10px;background:#fff;padding:10px 12px;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative}
+.da-pan h3{margin:0 0 4px;text-align:center;font-size:25px;font-weight:800}
+.da-scroll{flex:1;min-height:0;overflow:auto}
+.da-tab{width:100%;border-collapse:collapse}
+.da-tab th{position:sticky;top:0;z-index:1;background:#fcd5b4;color:#111;font-style:normal;font-weight:500;font-size:15px;padding:7px 8px;border:0;text-align:center;white-space:nowrap}
+.da-tab td{padding:3px 8px;border:0;text-align:center;white-space:nowrap;font-size:15px}
+.da-tab .sx{text-align:left}
+.da-tab td.sx{max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.da-tab td.comp{color:#555;font-size:13px}
+.da-tab tbody tr:nth-child(even) td{background:#fde9d9}
+.da-tab .eur{color:#e60000}
+.da-tab tfoot td{position:sticky;bottom:0;background:#fbff7a;border-top:2px solid #fb8a3c}
+.da-tab .tenue{color:#888;font-style:italic}
+.da-destra{display:flex;flex-direction:column;gap:10px;min-height:0}
+.da-agg{border:3px solid #ff2bd6;background:#f9ff5c;border-radius:10px;text-align:center;padding:8px 10px;color:#b4009f}
+.da-agg div{font-size:19px}
+.da-agg b{display:block;font-size:24px;font-weight:500;margin-top:2px}
+.da-prod{flex:1}
+.da-prod .tot{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#d9fbec;border:4px solid #8ff0c4;border-radius:44px;margin:6px 4px 4px;font-size:58px;font-weight:800;color:#111;line-height:1.05;text-align:center}
+.da-prod .tot small{font-size:12px;font-weight:500;color:var(--tenue);margin-top:6px;max-width:90%}
+.da-svg{flex:1;min-height:0;width:100%;display:block}
+.da-svg>svg{width:100%;height:100%;display:block}
+.da-svg [data-tip]{cursor:default}
+.da-svg [data-tip]:hover{opacity:.82}
+#da-tip{position:fixed;z-index:60;pointer-events:none;background:#fff;border:1px solid var(--bordo);border-radius:8px;padding:6px 9px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.14);display:none;white-space:nowrap}
+@media (max-width:1100px){.da-riga.r1,.da-riga.r2{grid-template-columns:1fr;height:auto}.da-pan{min-height:320px}.da-scroll{max-height:440px}.da-svg>svg{height:auto;max-height:380px}}
 /* modulo (come il report) */
 .mod-tela{--mod-blu:#5b5bff;--mod-lav:#dfdefb;--mod-lav2:#ebeafd;position:relative;border-radius:var(--r);padding:12px 0 10px;
   background:linear-gradient(rgba(255,255,255,.74),rgba(255,255,255,.74)),var(--mod-sfondo,none) center/cover,#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -641,7 +678,7 @@ function voci() {
   if (r !== 'magazzino') v.push(['foglio', r === 'scheda' ? S.profilo.nome : 'Inserimento Dati']);
   if (r !== 'scheda') { v.push(['elabora', 'Da elaborare']); v.push(['avanzamento', 'Avanzamento']); v.push(['modulo', 'Modulo']); }
   if (r === 'admin' || respProfilo()) v.push(['responsabilita', r === 'scheda' ? 'Riepilogo ' + respProfilo() : 'Responsabilità']); // il magazzino non la vede
-  if (r === 'admin') { v.push(['anagrafiche', 'Database']); v.push(['profili', 'Profili']); v.push(['import', 'Importa']); }
+  if (r === 'admin') { v.push(['analytics', 'Data Analytics']); v.push(['anagrafiche', 'Database']); v.push(['profili', 'Profili']); v.push(['import', 'Importa']); }
   return v;
 }
 function mostraApp() {
@@ -661,7 +698,7 @@ function vai(v) {
   S.vista = v; store.set('rlv_vista_' + S.profilo.nome, v);
   $$('#nav button').forEach(b => b.classList.toggle('att', b.dataset.v === v));
   chiudiPop();
-  const f = { foglio: vistaFoglio, elabora: vistaElabora, avanzamento: vistaAvanzamento, modulo: vistaModulo, responsabilita: vistaResponsabilita, anagrafiche: vistaAnagrafiche, profili: vistaProfili, import: vistaImport }[v];
+  const f = { foglio: vistaFoglio, elabora: vistaElabora, avanzamento: vistaAvanzamento, modulo: vistaModulo, responsabilita: vistaResponsabilita, analytics: vistaAnalytics, anagrafiche: vistaAnagrafiche, profili: vistaProfili, import: vistaImport }[v];
   $('#vista').innerHTML = '';
   f();
 }
@@ -1521,6 +1558,157 @@ async function eliminaRichiesta(id) {
 const REPARTI_MODULO = ['Pelle', 'Fodere', 'Infustiture', 'Tessuto'];
 const COL_MODULO = [['componente', 'Componente'], ['pz', 'Pz KO'], ['min_taglio', 'Minuti<br>Taglio'], ['min_prep', 'Minuti<br>Preparazione'], ['min_ting', 'Minuti<br>Tingitura'], ['min_rma', 'Minuti<br>RMA']];
 S.sfondo = store.get('rlv_sfondo') || null;
+/* ===================== DATA ANALYTICS (come il report Power BI) ===================== */
+// colori fissi per responsabilità (il colore segue la voce, non la posizione); oltre 7 voci la torta raggruppa in "Altre"
+const DA_COLORI = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'];
+const DA_FISSI = ['Preparazione', 'Taglio', 'Accessori', 'Assemblaggio', 'Mancante', 'Altro', 'Saldo produzione'];
+const DA_SENZA = 'Non assegnata';
+const fmtEur0 = v => fmt(v || 0, 0) + ' €';
+const pct = (v, d = 1) => fmt(v * 100, d) + '%';
+function vistaAnalytics() {
+  S.filtri.da = S.filtri.da || { anno: String(new Date().getFullYear()) };
+  $('#vista').innerHTML = `<div class="filtri no-print">
+      <select id="da-anno" class="filtro-sel" title="Anno"><option>${esc(S.filtri.da.anno)}</option></select>
+      <span class="sub" id="da-info"></span><div class="spazio" style="flex:1"></div>
+      <button class="btn" onclick="impostaBorse()" title="Da dove si leggono le borse prodotte">Borse prodotte · NEXUS</button>
+      <button class="btn" onclick="caricaAnalytics()">Aggiorna</button></div>
+    <div class="da-tela">${intestazioneHtml('da-int', false)}
+      <div class="da-riga r1">
+        <section class="da-pan"><div class="da-scroll" id="da-resp"></div></section>
+        <section class="da-pan"><h3>Responsabilità</h3><div class="da-svg" id="da-torta"></div></section>
+        <div class="da-destra">
+          <div class="da-agg"><div>Ultimo Aggiornamento</div><b id="da-ultimo">—</b></div>
+          <section class="da-pan da-prod"><h3>Totale Prodotti (Pcs)</h3><div class="tot" id="da-borse">—</div></section>
+        </div></div>
+      <div class="da-riga r2">
+        <section class="da-pan"><h3>Segnalazione Reparti</h3><div class="da-svg" id="da-reparti"></div></section>
+        <section class="da-pan"><div class="da-scroll" id="da-mot"></div></section>
+        <section class="da-pan"><div class="da-scroll" id="da-descr"></div></section>
+      </div></div><div id="da-tip"></div>`;
+  $('#da-anno').addEventListener('change', e => { S.filtri.da.anno = e.target.value; caricaAnalytics(); });
+  const tip = $('#da-tip');
+  $('.da-tela').addEventListener('mousemove', e => {
+    const t = e.target.closest('[data-tip]');
+    if (!t) { tip.style.display = 'none'; return; }
+    tip.innerHTML = t.dataset.tip; tip.style.display = 'block';
+    const w = tip.offsetWidth; tip.style.left = Math.min(e.clientX + 14, innerWidth - w - 8) + 'px'; tip.style.top = (e.clientY + 14) + 'px';
+  });
+  $('.da-tela').addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  caricaAnalytics();
+}
+async function caricaAnalytics() {
+  $('#da-info').textContent = 'Carico…';
+  try {
+    const d = await api('/api/analytics', { query: { anno: S.filtri.da.anno } });
+    if (!$('#da-resp')) return;
+    S.cache.da = d;
+    const anni = [...new Set([d.anno, String(new Date().getFullYear()), ...d.anni])].sort().reverse();
+    $('#da-anno').innerHTML = anni.map(a => `<option ${a === d.anno ? 'selected' : ''}>${a}</option>`).join('');
+    disegnaAnalytics();
+  } catch (e) { if ($('#da-info')) $('#da-info').textContent = ''; toast(e.message, 'err'); }
+}
+function disegnaAnalytics() {
+  const d = S.cache.da, t = d.totale || {}, borse = d.borse && d.borse.valore ? Number(d.borse.valore) : null;
+  const totPz = Number(t.pz) || 0, totEur = Number(t.eur) || 0;
+  $('#da-info').textContent = `${fmtN(t.n || 0)} righe · esclusi "Non Richiedere" e "Taglio Floriano"`;
+  // ultimo aggiornamento: l'ultima riga inserita o modificata
+  $('#da-ultimo').textContent = t.ultimo ? new Date(t.ultimo).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(',', '') : '—';
+  const b = d.borse || {};
+  $('#da-borse').innerHTML = borse !== null ? `${fmtN(Math.round(borse))}<small>Borse LV prodotte nel ${esc(d.anno)} · da NEXUS</small>`
+    : `—<small>${esc(b.messaggio || 'Borse prodotte non disponibili')}</small>`;
+  // tabella responsabilità
+  const eb = v => borse ? fmt(v / borse, 2) + ' €' : '—';
+  const nome = x => x.nome || DA_SENZA;
+  $('#da-resp').innerHTML = `<table class="da-tab"><thead><tr><th class="sx">Responsabilità</th><th class="eur">€/Borsa</th><th>Pz KO/Borse Prodotte</th><th>Pz KO</th><th class="eur">Totale Difetti ▾</th></tr></thead>
+    <tbody>${d.responsabilita.map(x => `<tr><td class="sx ${x.nome ? '' : 'tenue'}">${esc(nome(x))}</td><td class="eur">${eb(x.eur)}</td><td>${totPz ? pct(x.pz / totPz) : '—'}</td><td>${fmtN(Math.round(x.pz || 0))}</td><td class="eur">${fmtEur0(x.eur)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="tenue" style="padding:20px">Nessuna riga in questo anno</td></tr>'}</tbody>
+    <tfoot><tr><td class="sx">Totale</td><td class="eur">${eb(totEur)}</td><td>${totPz ? '100,0%' : '—'}</td><td>${fmtN(Math.round(totPz))}</td><td class="eur">${fmtEur0(totEur)}</td></tr></tfoot></table>`;
+  // torta: Pz KO per responsabilità
+  const voci = d.responsabilita.filter(x => x.pz > 0).map(x => ({ nome: nome(x), v: Number(x.pz) })).sort((a, b) => b.v - a.v);
+  const top = voci.slice(0, 7), resto = voci.slice(7), liberi = DA_COLORI.filter((c, i) => !top.some(x => DA_FISSI[i] === x.nome));
+  top.forEach(x => { const i = DA_FISSI.indexOf(x.nome); x.col = i >= 0 ? DA_COLORI[i] : liberi.shift(); });
+  if (resto.length) top.push({ nome: 'Altre', v: resto.reduce((s, x) => s + x.v, 0), col: '#9a9a9a', det: resto });
+  $('#da-torta').innerHTML = svgTorta(top, totPz);
+  // barre: Pz KO per reparto (foglio)
+  $('#da-reparti').innerHTML = svgBarre(d.reparti.filter(x => x.pz > 0).map(x => ({ nome: x.nome, v: Number(x.pz) })));
+  // motivazioni e descrizioni: Totale €
+  const tabEur = (titolo, righe, celle) => `<table class="da-tab"><thead><tr>${titolo}<th class="eur">Totale ▾</th></tr></thead>
+    <tbody>${righe.map(x => `<tr>${celle(x)}<td class="eur">${fmtEur0(x.eur)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td class="sx" colspan="${titolo.split('<th').length - 1}">Totale</td><td class="eur">${fmtEur0(totEur)}</td></tr></tfoot></table>`;
+  $('#da-mot').innerHTML = tabEur('<th class="sx">Motivazione</th><th class="sx">Componente</th>', d.motivazioni,
+    x => `<td class="sx" title="${esc(x.motivazione || '')}">${esc(x.motivazione || '')}</td><td class="sx comp" title="${esc(x.componente || '')}">${esc(x.componente || '')}</td>`);
+  $('#da-descr').innerHTML = tabEur('<th class="sx">Descrizione</th>', d.descrizioni, x => `<td class="sx" title="${esc(x.nome || '')}">${esc(x.nome || '')}</td>`);
+}
+function svgTorta(voci, tot) {
+  if (!tot || !voci.length) return '<p class="sub" style="text-align:center;margin-top:60px">Nessun dato</p>';
+  const W = 540, H = 330, cx = W / 2, cy = H / 2, r = 112;
+  let a0 = -Math.PI / 2, fette = '', etich = [];
+  const P = (a, rr) => [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];
+  for (const x of voci) {
+    const f = x.v / tot, a1 = a0 + f * 2 * Math.PI, am = (a0 + a1) / 2;
+    const tip = `<b>${esc(x.nome)}</b><br>Pz KO ${fmtN(Math.round(x.v))} · ${pct(f, 2)}` + (x.det ? '<br>' + x.det.map(y => esc(y.nome) + ' ' + fmtN(Math.round(y.v))).join('<br>') : '');
+    const [x0, y0] = P(a0, r), [x1, y1] = P(a1, r);
+    const path = f >= 0.9999 ? `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0` : `M${cx} ${cy}L${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
+    fette += `<path d="${path}" fill="${x.col}" stroke="#fff" stroke-width="2" data-tip="${esc(tip)}"/>`;
+    if (f >= 0.03) etich.push({ am, nome: x.nome.length > 15 ? x.nome.slice(0, 14) + '…' : x.nome, p: pct(f, 2), tip });
+    a0 = a1;
+  }
+  // etichette fuori dalla torta con la linea di richiamo, spaziate per non sovrapporsi
+  let out = '';
+  for (const lato of [1, -1]) {
+    const e = etich.filter(x => (Math.cos(x.am) >= 0 ? 1 : -1) === lato).map(x => ({ ...x, y: P(x.am, r + 18)[1] })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < e.length; i++) e[i].y = Math.max(e[i].y, e[i - 1].y + 34);
+    for (let i = e.length - 1; i >= 0; i--) { e[i].y = Math.min(e[i].y, (i === e.length - 1 ? H - 24 : e[i + 1].y - 34)); }
+    for (let i = 0; i < e.length; i++) e[i].y = Math.max(e[i].y, i ? e[i - 1].y + 34 : 14);
+    for (const x of e) {
+      const [ax, ay] = P(x.am, r + 2), [bx] = P(x.am, r + 14), ex = cx + lato * (r + 30);
+      out += `<polyline points="${ax.toFixed(1)},${ay.toFixed(1)} ${bx.toFixed(1)},${x.y.toFixed(1)} ${ex.toFixed(1)},${x.y.toFixed(1)}" fill="none" stroke="#999" stroke-width="1"/>`
+        + `<text x="${(ex + lato * 4).toFixed(1)}" y="${(x.y - 2).toFixed(1)}" font-size="15" text-anchor="${lato > 0 ? 'start' : 'end'}" fill="#222" data-tip="${esc(x.tip)}">${esc(x.nome)}<tspan x="${(ex + lato * 4).toFixed(1)}" dy="17" fill="#555">${esc(x.p)}</tspan></text>`;
+    }
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pz KO per responsabilità">${fette}${out}</svg>`;
+}
+// "Sara Visintin" → "S.Visintin" (come nel report); i reparti restano interi
+const nomeCorto = s => { const p = String(s || '').trim().split(/\s+/); return p.length === 2 && /^[A-Z][a-zà-ù]+$/.test(p[1]) && !/^(Preparazione|Taglio|Tingitura|Assemblaggio|Magazzino|Reparto)$/i.test(p[0]) ? p[0][0] + '.' + p[1] : s; };
+function svgBarre(voci) {
+  if (!voci.length) return '<p class="sub" style="text-align:center;margin-top:60px">Nessun dato</p>';
+  const W = 600, H = 330, sx = 20, dx = 10, top = 26, base = 245, n = voci.length;
+  const max = Math.max(...voci.map(x => x.v)), passo = (W - sx - dx) / n, bw = Math.max(6, passo - 3);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pz KO per reparto">
+    <line x1="${sx}" x2="${W - dx}" y1="${base}" y2="${base}" stroke="#c9c9c9"/>
+    ${voci.map((x, i) => {
+      const h = Math.max(1, (x.v / max) * (base - top)), X = sx + i * passo + (passo - bw) / 2, cxx = X + bw / 2, tip = `<b>${esc(x.nome)}</b><br>Pz KO ${fmtN(Math.round(x.v))}`;
+      return `<rect x="${X.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="#fbbf93" stroke="#f08a4b" stroke-width="1.5" data-tip="${esc(tip)}"/>`
+        + `<text x="${cxx.toFixed(1)}" y="${(base - h - 6).toFixed(1)}" font-size="${n > 14 ? 9.5 : 12}" text-anchor="middle" fill="#222">${fmtN(Math.round(x.v))}</text>`
+        + `<text transform="translate(${(cxx + 4).toFixed(1)} ${base + 12}) rotate(-35)" font-size="${n > 14 ? 10 : 12.5}" text-anchor="end" fill="#222" data-tip="${esc(tip)}">${esc(nomeCorto(x.nome).length > 14 ? nomeCorto(x.nome).slice(0, 13) + '…' : nomeCorto(x.nome))}</text>`;
+    }).join('')}</svg>`;
+}
+async function impostaBorse() {
+  try {
+    const p = await api('/api/admin/nexus/borse');
+    modale('Borse prodotte da NEXUS', `<p class="sub" style="margin-top:0">Il totale delle borse LV prodotte serve per €/Borsa e Totale Prodotti: il Worker lo legge
+      direttamente dal database di NEXUS (qualità di oggi + storico), solo in lettura${p.collegato ? '' : ' — <b class="err-txt">ora il database di NEXUS non è collegato al Worker</b>'}.
+      Nella query <code>{ANNO}</code> diventa l'anno scelto.</p>
+      <label class="campo">Query SQL su NEXUS<textarea id="bo-sql" rows="9" style="font:12px/1.45 Consolas,monospace">${esc(p.sql)}</textarea></label>
+      <div class="riga-flex" style="margin-top:8px"><button class="btn" onclick="$('#bo-sql').value=S.sqlBorse">Query predefinita</button><span class="sub" id="bo-info"></span></div>`,
+      `<button class="btn" onclick="provaBorse()" ${p.collegato ? '' : 'disabled'}>Prova</button><button class="btn prim" onclick="salvaBorse()" ${p.collegato ? '' : 'disabled'}>Salva</button>`, true);
+    S.sqlBorse = p.predefinita;
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function provaBorse() {
+  $('#bo-info').textContent = 'Leggo NEXUS…';
+  try {
+    const r = await api('/api/admin/nexus/borse/prova', { method: 'POST', body: { sql: $('#bo-sql').value, anno: S.filtri.da.anno } });
+    $('#bo-info').innerHTML = `<span class="ok-txt">✓ ${r.anno}: ${fmtN(Math.round(r.valore))} borse prodotte</span>`;
+  } catch (e) { $('#bo-info').textContent = ''; toast(e.message, 'err'); }
+}
+async function salvaBorse() {
+  try {
+    await api('/api/admin/nexus/borse', { method: 'PUT', body: { sql: $('#bo-sql').value } });
+    chiudiModale(); toast('Query salvata', 'ok'); caricaAnalytics();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 const ICONA_STAMPA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="2.5" y="9" width="19" height="8" rx="2"/><path d="M6 14h12v7H6z"/><circle cx="18" cy="12" r=".6" fill="currentColor"/></svg>';
 function stampaModulo() {
   const m = S.cache.modulo;
@@ -1986,6 +2174,11 @@ function nuovaRigaCe(base = {}) { return { uid: ++ceUid, id: null, componente: '
 function principaliCe(esclusa) { return S.ce.righe.filter(r => !r.padreUid && r.uid !== esclusa && String(r.componente).trim()); }
 function disegnaCe() {
   const c = S.ce, box = $('#ce-out'); if (!box) return;
+  // si riparte da dove si stava lavorando: stessa posizione della tabella e stessa cella (riga e colonna)
+  const w0 = $('#ce-out .tabwrap'), att = document.activeElement;
+  const pos = w0 ? { t: w0.scrollTop, l: w0.scrollLeft, y: window.scrollY } : null;
+  const trA = att && att.dataset && att.dataset.f && att.closest('.tab-ce tbody tr');
+  const fuoco = trA ? { i: [...trA.parentNode.children].indexOf(trA), f: att.dataset.f } : null;
   const tip = [...new Set([...c.tipologie, ...TIPOLOGIE_BASE])];
   const nRinf = uid => c.righe.filter(r => r.padreUid === uid).length;
   box.innerHTML = `<datalist id="dl-tipologie">${tip.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
@@ -2000,7 +2193,7 @@ function disegnaCe() {
       <button class="btn" onclick="incollaCe()">Incolla da Excel</button></div></div>
     <div class="tabwrap tab-alta"><table class="foglio tab-ce"><thead><tr>
       <th class="c-sel"><input type="checkbox" id="ce-tutti" title="Seleziona tutte le righe"></th><th>#</th><th>Componente</th><th>Rinforzo di</th><th>#Materiale</th><th>N° pz</th><th>CNS area</th><th>sec. Taglio</th><th>sec. Prep.</th><th>sec. Ting.</th><th>sec. RMA</th>
-      <th>Cod. materiale</th><th>Descrizione materiale</th><th class="n">€</th><th>TM</th><th></th></tr></thead>
+      <th class="c-ro" title="Si aggiorna da solo: non si modifica">Cod. materiale</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">Descrizione materiale</th><th class="n c-ro" title="Si aggiorna da solo: non si modifica">€</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">TM</th><th></th></tr></thead>
     <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : ''} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
       <td class="c-sel"><input type="checkbox" data-sel="${r.uid}" ${c.sel && c.sel.has(r.uid) ? 'checked' : ''}></td>
       <td class="sub c-centro">${i + 1}</td>
@@ -2008,8 +2201,8 @@ function disegnaCe() {
       <td><select data-f="padre" style="width:170px"><option value="">— principale —</option>${principaliCe(r.uid).filter(p => !nRinf(r.uid) || p.uid === r.padreUid).map(p => `<option value="${p.uid}" ${p.uid === r.padreUid ? 'selected' : ''}>${esc(p.componente)}</option>`).join('')}</select></td>
       <td><input data-f="n_materiale" list="dl-tipologie" value="${esc(r.n_materiale)}" style="width:140px"></td>
       ${CE_NUM.map(k => `<td><input data-f="${k}" inputmode="decimal" value="${esc(String(r[k] ?? '').replace('.', ','))}" style="width:${k === 'cns_area' ? 84 : 70}px"></td>`).join('')}
-      <td class="sub">${esc(r.codice_materiale || '')}</td><td class="sub" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.descr_materiale || '')}</td>
-      <td class="n sub">${fmt(r.prezzo, 2)}</td><td class="sub">${esc(r.tm || '')}</td>
+      <td class="sub c-ro">${esc(r.codice_materiale || '')}</td><td class="sub c-ro" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.descr_materiale || '')}</td>
+      <td class="n sub c-ro">${fmt(r.prezzo, 2)}</td><td class="sub c-ro">${esc(r.tm || '')}</td>
       <td style="white-space:nowrap">${r.padreUid ? '' : `<button class="btn picc" onclick="aggiungiRinforzo(${r.uid})" title="Aggiungi un rinforzo sotto questo componente">+ rinforzo</button>`}
         <button class="icona" title="Elimina" onclick="togliCe(${r.uid})">✕</button></td></tr>`).join('')}</tbody></table></div>
     <div class="barra-salva" id="ce-barra"><span id="ce-stato" class="sub"></span><div class="spazio" style="flex:1"></div>
@@ -2061,6 +2254,9 @@ function disegnaCe() {
     segna(); disegnaCe(); toast('Righe incollate', 'ok');
   });
   aggiornaStatoCe(); aggiornaSelCe();
+  const w = $('#ce-out .tabwrap');
+  if (pos && w) { w.scrollTop = pos.t; w.scrollLeft = pos.l; window.scrollTo(0, pos.y); }
+  if (fuoco) { const tr = tb.children[fuoco.i], el = tr && $(`[data-f="${fuoco.f}"]`, tr); if (el) el.focus({ preventScroll: true }); }
 }
 function aggiornaSelCe() {
   const c = S.ce, b = $('#ce-elimina'), tutti = $('#ce-tutti'); if (!b) return;
@@ -2171,9 +2367,10 @@ async function salvaCe() {
   } catch (e) { toast(e.message, 'err'); $('#ce-salva').disabled = false; }
 }
 
-async function caricaAna(offset = 0) {
+async function caricaAna(offset = 0, opz = {}) {
   const t = S.filtri.anaTab || 'componenti';
   S.filtri.anaQ = $('#an-q').value.trim();
+  const w0 = $('#an-tab .tabwrap'), pos = opz.mantieni && w0 ? { t: w0.scrollTop, l: w0.scrollLeft, y: window.scrollY } : null; // dopo un salvataggio si resta dove si stava lavorando
   try {
     const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset } });
     if (!$('#an-tab')) return;
@@ -2181,8 +2378,8 @@ async function caricaAna(offset = 0) {
     const cfg = TAB[t];
     $('#an-info').textContent = `${fmtN(r.totale)} record${r.totale > 200 ? ` · ${offset + 1}-${offset + r.righe.length}` : ''}`;
     S.filtri.anaTot = r.totale; S.filtri.anaOff = offset;
-    $('#an-tab').innerHTML = `<div class="tabwrap tab-alta"><table><thead><tr><th class="c-sel"><input type="checkbox" id="an-tutti" title="Seleziona tutte le righe della pagina"></th>${cfg.c.map(c => `<th class="${c[2] === 'n' ? 'n' : ''}">${c[1]}</th>`).join('')}<th></th></tr></thead>
-      <tbody>${r.righe.map((x, i) => `<tr data-id="${x.id}" class="${S.selAna.has(x.id) ? 'sel' : ''}"><td class="c-sel"><input type="checkbox" data-sel="${x.id}" ${S.selAna.has(x.id) ? 'checked' : ''}></td>${cfg.c.map(c => `<td class="${c[2] === 'n' ? 'n' : ''}">${c[2] === 'n' ? fmtN(x[c[0]]) : esc(x[c[0]] ?? '')}</td>`).join('')}
+    $('#an-tab').innerHTML = `<div class="tabwrap tab-alta"><table><thead><tr><th class="c-sel"><input type="checkbox" id="an-tutti" title="Seleziona tutte le righe della pagina"></th>${cfg.c.map(c => `<th class="${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}" ${c[2] === 'ro' ? 'title="Calcolata: non si modifica"' : ''}>${c[1]}</th>`).join('')}<th></th></tr></thead>
+      <tbody>${r.righe.map((x, i) => `<tr data-id="${x.id}" class="${S.selAna.has(x.id) ? 'sel' : ''}"><td class="c-sel"><input type="checkbox" data-sel="${x.id}" ${S.selAna.has(x.id) ? 'checked' : ''}></td>${cfg.c.map(c => `<td class="${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}">${c[2] === 'n' ? fmtN(x[c[0]]) : esc(x[c[0]] ?? '')}</td>`).join('')}
         <td><button class="icona" onclick="editAna(${i})">✎</button></td></tr>`).join('')}</tbody></table></div>
       <div class="riga-flex" style="justify-content:center;margin:10px">${offset > 0 ? `<button class="btn" onclick="caricaAna(${Math.max(0, offset - 200)})">← Precedenti</button>` : ''}
         ${offset + r.righe.length < r.totale ? `<button class="btn" onclick="caricaAna(${offset + 200})">Successivi →</button>` : ''}</div>`;
@@ -2198,6 +2395,13 @@ async function caricaAna(offset = 0) {
       ultimo = id; aggiornaSelAna();
     });
     aggiornaSelAna();
+    const w = $('#an-tab .tabwrap'), tr = opz.evidenzia ? $(`#an-tab tr[data-id="${opz.evidenzia}"]`) : null;
+    if (pos && w) { w.scrollTop = pos.t; w.scrollLeft = pos.l; window.scrollTo(0, pos.y); }
+    if (tr) {
+      const wr = w.getBoundingClientRect(), rr = tr.getBoundingClientRect();
+      if (rr.top < wr.top + 40 || rr.bottom > wr.bottom) w.scrollTop += rr.top - wr.top - w.clientHeight / 2 + rr.height / 2; // la riga resta in vista
+      tr.classList.add('evidenzia');
+    }
   } catch (e) { toast(e.message, 'err'); }
 }
 function aggiornaSelAna() {
@@ -2224,7 +2428,7 @@ async function eliminaSelAna() {
   try {
     let fatte = 0;
     for (let i = 0; i < ids.length; i += 1000) fatte += (await api('/api/admin/tabella/' + t + '/elimina', { method: 'POST', body: { ids: ids.slice(i, i + 1000) } })).eliminate;
-    S.selAna.clear(); toast(`${fmtN(fatte)} righe eliminate`, 'ok'); caricaAna(); caricaAnagrafiche();
+    S.selAna.clear(); toast(`${fmtN(fatte)} righe eliminate`, 'ok'); caricaAna(S.filtri.anaOff || 0, { mantieni: true }); caricaAnagrafiche();
   } catch (e) { toast(e.message, 'err'); }
 }
 function editAna(i) {
@@ -2239,14 +2443,17 @@ async function salvaAna(id) {
   const t = S.filtri.anaTab || 'componenti', cfg = TAB[t];
   const body = {}; cfg.c.filter(c => c[2] !== 'ro').forEach(c => body[c[0]] = $('#an-' + c[0]).value);
   try {
-    await api('/api/admin/tabella/' + t + (id ? '/' + id : ''), { method: id ? 'PUT' : 'POST', body });
-    chiudiModale(); toast('Salvato', 'ok'); caricaAna(); caricaAnagrafiche();
+    const r = await api('/api/admin/tabella/' + t + (id ? '/' + id : ''), { method: id ? 'PUT' : 'POST', body });
+    chiudiModale(); toast('Salvato', 'ok');
+    // la riga nuova va in fondo (ordine di inserimento): si apre la pagina dove finisce; una modifica resta sulla pagina attuale
+    const off = id ? (S.filtri.anaOff || 0) : Math.floor((S.filtri.anaTot || 0) / 200) * 200;
+    caricaAna(off, { mantieni: off === (S.filtri.anaOff || 0), evidenzia: id || r.id }); caricaAnagrafiche();
   } catch (e) { toast(e.message, 'err'); }
 }
 async function delAna(id) {
   if (!confirm('Eliminare questo record?')) return;
   const t = S.filtri.anaTab || 'componenti';
-  try { await api(`/api/admin/tabella/${t}/${id}`, { method: 'DELETE' }); chiudiModale(); toast('Eliminato', 'ok'); caricaAna(); caricaAnagrafiche(); }
+  try { await api(`/api/admin/tabella/${t}/${id}`, { method: 'DELETE' }); chiudiModale(); toast('Eliminato', 'ok'); caricaAna(S.filtri.anaOff || 0, { mantieni: true }); caricaAnagrafiche(); }
   catch (e) { toast(e.message, 'err'); }
 }
 
