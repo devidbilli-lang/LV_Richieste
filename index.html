@@ -553,7 +553,7 @@ function modale(titolo, corpo, piede = '', largo = false) {
   const f = v.querySelector('input:not([readonly]),select,textarea'); if (f) setTimeout(() => f.focus(), 30);
   return v;
 }
-function chiudiModale() { const v = $('#velo'); if (v) v.remove(); }
+function chiudiModale() { const v = $('#velo'); if (v) v.remove(); if (S.novita) setTimeout(aggiornaDaAltri, 300); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#velo')) chiudiModale(); else if ($('#pannello')) chiudiForm(); chiudiPop(); } });
 function occhio(id) { return `<button type="button" onclick="const i=document.getElementById('${id}');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" aria-label="Mostra o nascondi">👁</button>`; }
 function badgeStato(s) {
@@ -733,7 +733,58 @@ function voci() {
   if (r === 'admin') { v.push(['analytics', 'Data Analytics']); v.push(['anagrafiche', 'Database']); v.push(['profili', 'Profili']); v.push(['import', 'Importa']); }
   return v;
 }
+/* ===================== AGGIORNAMENTO QUASI IN TEMPO REALE =====================
+   Ogni 15 secondi (solo con la pagina in primo piano) chiede al Worker se qualcuno ha cambiato qualcosa; se sì ricarica la sezione aperta
+   tenendo la posizione nelle tabelle. Se l'utente sta lavorando (scrive in una casella, ha una finestra, un modulo o righe nuove aperte,
+   ha tolto delle spunte in Da elaborare) l'aggiornamento aspetta che abbia finito. */
+const SECONDI_NOVITA = 15;
+const RICARICA_VISTA = {
+  foglio: () => cercaRighe(),
+  elabora: () => caricaElabora(),
+  avanzamento: () => caricaAvanzamento(),
+  modulo: () => { if (!S.cache.modulo) return; S.cache.modulo = null; return caricaModulo(); },
+  responsabilita: () => caricaResponsabilita(),
+  analytics: () => caricaAnalytics(),
+};
+function staLavorando() {
+  if ($('#velo') || $('#pop') || $('#pannello') || $('#riga-edit') || S.form) return true;
+  if (S.nuove && S.nuove.length) return true;
+  const a = document.activeElement;
+  if (a && a.closest && a.closest('#vista') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type !== 'checkbox') return true;
+  if (S.vista === 'elabora' && $$('#el-lista input[type=checkbox]').some(c => !c.checked)) return true;
+  if (S.vista === 'foglio' && S.cache.righe && S.cache.righe.length > 500) return true; // ha caricato altre righe: non si torna alle prime 500
+  return false;
+}
+async function aggiornaDaAltri() {
+  const f = RICARICA_VISTA[S.vista];
+  if (!f) { S.novita = false; return; }
+  if (staLavorando()) return; // si riprova al prossimo controllo
+  S.novita = false;
+  const vista = S.vista, sel = '#vista .tabwrap, #vista .da-scroll', pos = $$(sel).map(w => [w.scrollTop, w.scrollLeft]), y = window.scrollY;
+  try { await f(); } catch (e) { return; }
+  if (S.vista !== vista) return;
+  $$(sel).forEach((w, i) => { if (pos[i]) { w.scrollTop = pos[i][0]; w.scrollLeft = pos[i][1]; } });
+  window.scrollTo(0, y);
+}
+async function controllaNovita() {
+  if (!S.token || document.hidden || S.controllo) return;
+  S.controllo = true;
+  try {
+    const { v } = await api('/api/versione');
+    if (S.versione === undefined) S.versione = v;
+    else if (v !== S.versione) { S.versione = v; S.novita = true; if (isMag()) aggiornaContaElabora(); }
+  } catch (e) {}
+  finally { S.controllo = false; }
+  if (S.novita) aggiornaDaAltri();
+}
+function avviaNovita() {
+  if (S.tmNovita) return;
+  S.tmNovita = setInterval(controllaNovita, SECONDI_NOVITA * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) controllaNovita(); }); // tornando sulla pagina controlla subito
+  document.addEventListener('focusout', () => setTimeout(() => { if (S.novita) aggiornaDaAltri(); }, 400)); // finito di scrivere: l'aggiornamento in attesa parte subito
+}
 function mostraApp() {
+  avviaNovita(); S.versione = undefined; controllaNovita(); // punto di partenza: i dati appena caricati
   const p = S.profilo;
   $('#app').innerHTML = `<header><div class="barra"><div class="marchio-app"><small>LV_Richieste</small></div>
     <span class="spazio"></span>
