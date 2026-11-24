@@ -369,6 +369,7 @@ tr.sel td{background:#fff4d6!important}
 .da-tab td{padding:3px 8px;border:0;text-align:center;white-space:nowrap;font-size:15px}
 .da-tab .sx{text-align:left}
 .da-tab td.sx{max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.da-tab.adatta td.sx{max-width:0} /* i testi lunghi si accorciano: il Totale resta sempre nel riquadro */
 .da-tab td.comp{color:#555;font-size:13px}
 .da-tab tbody tr:nth-child(even) td{background:#fde9d9}
 .da-tab .eur{color:#e60000}
@@ -381,12 +382,12 @@ tr.sel td{background:#fff4d6!important}
 .da-prod{flex:1}
 .da-prod .tot{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#d9fbec;border:4px solid #8ff0c4;border-radius:44px;margin:6px 4px 4px;font-size:58px;font-weight:800;color:#111;line-height:1.05;text-align:center}
 .da-prod .tot small{font-size:12px;font-weight:500;color:var(--tenue);margin-top:6px;max-width:90%}
-.da-svg{flex:1;min-height:0;width:100%;display:block}
+.da-svg{flex:1;min-height:0;width:100%;display:block;overflow:hidden}
 .da-svg>svg{width:100%;height:100%;display:block}
 .da-svg [data-tip]{cursor:default}
 .da-svg [data-tip]:hover{opacity:.82}
 #da-tip{position:fixed;z-index:60;pointer-events:none;background:#fff;border:1px solid var(--bordo);border-radius:8px;padding:6px 9px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.14);display:none;white-space:nowrap}
-@media (max-width:1100px){.da-riga.r1,.da-riga.r2{grid-template-columns:1fr;height:auto}.da-pan{min-height:320px}.da-scroll{max-height:440px}.da-svg>svg{height:auto;max-height:380px}}
+@media (max-width:1100px){.da-riga.r1,.da-riga.r2{grid-template-columns:1fr;height:auto}.da-pan{min-height:320px}.da-scroll{max-height:440px}.da-svg{flex:none;height:320px}}
 /* modulo (come il report) */
 .mod-tela{--mod-blu:#fb8a3c;--mod-lav:#fcd5b4;--mod-lav2:#fde9d9; /* arancione come Data Analytics */position:relative;border-radius:var(--r);padding:12px 0 10px;
   background:linear-gradient(rgba(255,255,255,.74),rgba(255,255,255,.74)),var(--mod-sfondo,none) center/cover,#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1714,59 +1715,104 @@ function disegnaAnalytics() {
   const top = voci.slice(0, 7), resto = voci.slice(7), liberi = DA_COLORI.filter((c, i) => !top.some(x => DA_FISSI[i] === x.nome));
   top.forEach(x => { const i = DA_FISSI.indexOf(x.nome); x.col = i >= 0 ? DA_COLORI[i] : liberi.shift(); });
   if (resto.length) top.push({ nome: 'Altre', v: resto.reduce((s, x) => s + x.v, 0), col: '#9a9a9a', det: resto });
-  $('#da-torta').innerHTML = svgTorta(top, totPz);
   // barre: Pz KO per reparto (foglio)
-  $('#da-reparti').innerHTML = svgBarre(d.reparti.filter(x => x.pz > 0).map(x => ({ nome: x.nome, v: Number(x.pz) })));
+  S.cache.daGraf = { torta: top, totPz, reparti: d.reparti.filter(x => x.pz > 0).map(x => ({ nome: x.nome, v: Number(x.pz) })) };
+  disegnaGraficiDa();
   // motivazioni e descrizioni: Totale €
-  const tabEur = (titolo, righe, celle) => `<table class="da-tab"><thead><tr>${titolo}<th class="eur">Totale ▾</th></tr></thead>
+  const tabEur = (titolo, righe, celle) => `<table class="da-tab adatta"><thead><tr>${titolo}<th class="eur">Totale ▾</th></tr></thead>
     <tbody>${righe.map(x => `<tr>${celle(x)}<td class="eur">${fmtEur0(x.eur)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td class="sx" colspan="${titolo.split('<th').length - 1}">Totale</td><td class="eur">${fmtEur0(totEur)}</td></tr></tfoot></table>`;
-  $('#da-mot').innerHTML = tabEur('<th class="sx">Motivazione</th><th class="sx">Componente</th>', d.motivazioni,
+  $('#da-mot').innerHTML = tabEur('<th class="sx" style="width:56%">Motivazione</th><th class="sx" style="width:30%">Componente</th>', d.motivazioni,
     x => `<td class="sx" title="${esc(x.motivazione || '')}">${esc(x.motivazione || '')}</td><td class="sx comp" title="${esc(x.componente || '')}">${esc(x.componente || '')}</td>`);
   $('#da-descr').innerHTML = tabEur('<th class="sx">Descrizione</th>', d.descrizioni, x => `<td class="sx" title="${esc(x.nome || '')}">${esc(x.nome || '')}</td>`);
 }
-function svgTorta(voci, tot) {
+// i grafici si disegnano alla misura reale del riquadro: la torta e le barre lo riempiono e il testo resta sempre della stessa grandezza
+function disegnaGraficiDa() {
+  const g = S.cache.daGraf, t = $('#da-torta'), b = $('#da-reparti'); if (!g || !t || !b) return;
+  t.innerHTML = svgTorta(g.torta, g.totPz, t.clientWidth, t.clientHeight);
+  b.innerHTML = svgBarre(g.reparti, b.clientWidth, b.clientHeight);
+}
+window.addEventListener('resize', () => { clearTimeout(S.tmGraf); S.tmGraf = setTimeout(disegnaGraficiDa, 120); });
+// larghezza reale del testo (stesso font della pagina): le etichette si accorciano solo se davvero non ci stanno
+const larghezzaTesto = (s, fs) => { const c = larghezzaTesto.c || (larghezzaTesto.c = document.createElement('canvas').getContext('2d')); c.font = `${fs}px ${getComputedStyle(document.body).fontFamily}`; return c.measureText(String(s)).width; };
+const taglia = (s, maxW, fs) => { s = String(s); if (larghezzaTesto(s, fs) <= maxW) return s; while (s.length > 2 && larghezzaTesto(s + '…', fs) > maxW) s = s.slice(0, -1); return s + '…'; };
+function svgTorta(voci, tot, W, H) {
   if (!tot || !voci.length) return '<p class="sub" style="text-align:center;margin-top:60px">Nessun dato</p>';
-  const W = 540, H = 330, cx = W / 2, cy = H / 2, r = 112;
-  let a0 = -Math.PI / 2, fette = '', etich = [];
-  const P = (a, rr) => [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];
+  W = Math.max(240, Math.round(W || 540)); H = Math.max(220, Math.round(H || 330));
+  const fs = W < 400 ? 13 : 15, lh = fs + 3, cw = fs * 0.6;
+  const fette = []; let a = -Math.PI / 2;
   for (const x of voci) {
-    const f = x.v / tot, a1 = a0 + f * 2 * Math.PI, am = (a0 + a1) / 2;
-    const tip = `<b>${esc(x.nome)}</b><br>Pz KO ${fmtN(Math.round(x.v))} · ${pct(f, 2)}` + (x.det ? '<br>' + x.det.map(y => esc(y.nome) + ' ' + fmtN(Math.round(y.v))).join('<br>') : '');
-    const [x0, y0] = P(a0, r), [x1, y1] = P(a1, r);
-    const path = f >= 0.9999 ? `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0` : `M${cx} ${cy}L${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
-    fette += `<path d="${path}" fill="${x.col}" stroke="#fff" stroke-width="2" data-tip="${esc(tip)}"/>`;
-    if (f >= 0.03) etich.push({ am, nome: x.nome.length > 15 ? x.nome.slice(0, 14) + '…' : x.nome, p: pct(f, 2), tip });
-    a0 = a1;
+    const f = x.v / tot, a1 = a + f * 2 * Math.PI;
+    fette.push({ ...x, f, a0: a, a1, am: (a + a1) / 2, p: pct(f, 2),
+      tip: `<b>${esc(x.nome)}</b><br>Pz KO ${fmtN(Math.round(x.v))} · ${pct(f, 2)}` + (x.det ? '<br>' + x.det.map(y => esc(y.nome) + ' ' + fmtN(Math.round(y.v))).join('<br>') : '') });
+    a = a1;
   }
-  // etichette fuori dalla torta con la linea di richiamo, spaziate per non sovrapporsi
-  let out = '';
-  for (const lato of [1, -1]) {
-    const e = etich.filter(x => (Math.cos(x.am) >= 0 ? 1 : -1) === lato).map(x => ({ ...x, y: P(x.am, r + 18)[1] })).sort((a, b) => a.y - b.y);
-    for (let i = 1; i < e.length; i++) e[i].y = Math.max(e[i].y, e[i - 1].y + 34);
-    for (let i = e.length - 1; i >= 0; i--) { e[i].y = Math.min(e[i].y, (i === e.length - 1 ? H - 24 : e[i + 1].y - 34)); }
-    for (let i = 0; i < e.length; i++) e[i].y = Math.max(e[i].y, i ? e[i - 1].y + 34 : 14);
-    for (const x of e) {
-      const [ax, ay] = P(x.am, r + 2), [bx] = P(x.am, r + 14), ex = cx + lato * (r + 30);
-      out += `<polyline points="${ax.toFixed(1)},${ay.toFixed(1)} ${bx.toFixed(1)},${x.y.toFixed(1)} ${ex.toFixed(1)},${x.y.toFixed(1)}" fill="none" stroke="#999" stroke-width="1"/>`
-        + `<text x="${(ex + lato * 4).toFixed(1)}" y="${(x.y - 2).toFixed(1)}" font-size="15" text-anchor="${lato > 0 ? 'start' : 'end'}" fill="#222" data-tip="${esc(x.tip)}">${esc(x.nome)}<tspan x="${(ex + lato * 4).toFixed(1)}" dy="17" fill="#555">${esc(x.p)}</tspan></text>`;
+  const corto = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+  const etich = fette.filter(x => x.f >= 0.03).map(x => ({ ...x, nome: corto(x.nome, 15) }));
+  const labW = Math.max(...etich.map(x => Math.max(larghezzaTesto(x.nome, fs), larghezzaTesto(x.p, fs))), 30) + 6;
+  let r = Math.floor(Math.min(H / 2 - 12, W / 2 - labW - 36)), cx = W / 2, cy = H / 2, out = '';
+  const legenda = r < 110; // poco posto per le etichette ai lati: legenda (a destra se il riquadro è largo, sotto se è stretto) e torta più grande
+  if (legenda) {
+    const rh = fs + 8, legW = Math.min(230, Math.max(...fette.map(x => larghezzaTesto(x.nome + ' ' + x.p, fs))) + 26), aLato = W - legW - 24 >= H * 0.85;
+    let col, colX, colW, y0, lf = fs;
+    if (aLato) { col = 1; colW = [legW]; colX = [W - legW]; r = Math.floor(Math.min((W - legW - 24) / 2, H / 2 - 6)); cx = Math.round((W - legW - 24) / 2) + 4; cy = H / 2; y0 = Math.round(H / 2 - (fette.length * rh) / 2 + fs); }
+    else {
+      col = W >= 300 ? 2 : 1; const legH = Math.ceil(fette.length / col) * rh + 10; r = Math.floor(Math.min(W / 2 - 8, (H - legH) / 2 - 6)); cy = r + 6; y0 = 2 * r + 22;
+      // colonne larghe quanto i loro testi, centrate sotto la torta; se non ci stanno si stringono in proporzione
+      const gap = 14, misure = f => Array.from({ length: col }, (_, k) => Math.max(...fette.filter((_, i) => i % col === k).map(x => larghezzaTesto(x.nome + ' ' + x.p, f) + 18)));
+      let nat = misure(lf), tot = nat.reduce((s, v) => s + v, 0) + gap * (col - 1);
+      if (tot > W - 8 && lf > 12) { lf = 12; nat = misure(lf); tot = nat.reduce((s, v) => s + v, 0) + gap * (col - 1); } // un punto in meno pur di non accorciare i nomi
+      const k = Math.min(1, (W - 8) / tot);
+      colW = nat.map(v => v * k); colX = [Math.max(4, (W - tot * k) / 2)]; if (col > 1) colX.push(colX[0] + colW[0] + gap * k);
+    }
+    fette.forEach((x, i) => {
+      const lx = colX[i % col], ly = y0 + Math.floor(i / col) * rh, maxW = colW[i % col] - 18 - larghezzaTesto(' ' + x.p, lf);
+      out += `<g data-tip="${esc(x.tip)}"><rect x="${lx}" y="${ly - lf + 2}" width="11" height="11" rx="2" fill="${x.col}"/>`
+        + `<text x="${lx + 16}" y="${ly}" font-size="${lf}" fill="#222">${esc(taglia(x.nome, maxW, lf))} <tspan fill="#555">${esc(x.p)}</tspan></text></g>`;
+    });
+  }
+  const P = (an, rr) => [cx + rr * Math.cos(an), cy + rr * Math.sin(an)];
+  const spicchi = fette.map(x => {
+    const [x0, y0] = P(x.a0, r), [x1, y1] = P(x.a1, r);
+    const path = x.f >= 0.9999 ? `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0` : `M${cx} ${cy}L${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${x.a1 - x.a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
+    return `<path d="${path}" fill="${x.col}" stroke="#fff" stroke-width="2" data-tip="${esc(x.tip)}"/>`;
+  }).join('');
+  if (!legenda) { // etichette fuori dalla torta con la linea di richiamo, spaziate per non sovrapporsi
+    for (const lato of [1, -1]) {
+      const e = etich.filter(x => (Math.cos(x.am) >= 0 ? 1 : -1) === lato).map(x => ({ ...x, y: P(x.am, r + 18)[1] })).sort((p, q) => p.y - q.y);
+      const gap = Math.min(2 * lh, (H - 16) / Math.max(1, e.length));
+      for (let i = 1; i < e.length; i++) e[i].y = Math.max(e[i].y, e[i - 1].y + gap);
+      for (let i = e.length - 1; i >= 0; i--) e[i].y = Math.min(e[i].y, i === e.length - 1 ? H - lh - 4 : e[i + 1].y - gap);
+      for (let i = 0; i < e.length; i++) e[i].y = Math.max(e[i].y, i ? e[i - 1].y + gap : fs);
+      for (const x of e) {
+        const [ax, ay] = P(x.am, r + 2), [bx] = P(x.am, r + 14), ex = cx + lato * (r + 30);
+        out += `<polyline points="${ax.toFixed(1)},${ay.toFixed(1)} ${bx.toFixed(1)},${x.y.toFixed(1)} ${ex.toFixed(1)},${x.y.toFixed(1)}" fill="none" stroke="#999" stroke-width="1"/>`
+          + `<text x="${(ex + lato * 4).toFixed(1)}" y="${(x.y - 2).toFixed(1)}" font-size="${fs}" text-anchor="${lato > 0 ? 'start' : 'end'}" fill="#222" data-tip="${esc(x.tip)}">${esc(x.nome)}<tspan x="${(ex + lato * 4).toFixed(1)}" dy="${lh}" fill="#555">${esc(x.p)}</tspan></text>`;
+      }
     }
   }
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pz KO per responsabilità">${fette}${out}</svg>`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pz KO per responsabilità">${spicchi}${out}</svg>`;
 }
 // "Sara Visintin" → "S.Visintin" (come nel report); i reparti restano interi
 const nomeCorto = s => { const p = String(s || '').trim().split(/\s+/); return p.length === 2 && /^[A-Z][a-zà-ù]+$/.test(p[1]) && !/^(Preparazione|Taglio|Tingitura|Assemblaggio|Magazzino|Reparto)$/i.test(p[0]) ? p[0][0] + '.' + p[1] : s; };
-function svgBarre(voci) {
+function svgBarre(voci, W, H) {
   if (!voci.length) return '<p class="sub" style="text-align:center;margin-top:60px">Nessun dato</p>';
-  const W = 600, H = 330, sx = 20, dx = 10, top = 26, base = 245, n = voci.length;
-  const max = Math.max(...voci.map(x => x.v)), passo = (W - sx - dx) / n, bw = Math.max(6, passo - 3);
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pz KO per reparto">
+  W = Math.max(260, Math.round(W || 600)); H = Math.max(200, Math.round(H || 330));
+  const n = voci.length, fs = W / n < 34 ? 11 : 14, cw = fs * 0.6, ang = 35 * Math.PI / 180;
+  const nomi = voci.map(x => { const s = nomeCorto(x.nome); return s.length > 14 ? s.slice(0, 13) + '…' : s; });
+  const lw = Math.max(...nomi.map(s => larghezzaTesto(s, fs))), passo0 = (W - 20) / n;
+  const dritti = passo0 >= lw + 10; // c'è posto: nomi orizzontali sotto le barre
+  const sotto = dritti ? fs + 14 : Math.ceil(lw * Math.sin(ang) + fs + 12);
+  const sx = dritti ? 10 : Math.max(10, Math.ceil(larghezzaTesto(nomi[0], fs) * Math.cos(ang) - passo0 / 2 + 6)), dx = 10, top = fs + 12, base = H - sotto;
+  const max = Math.max(...voci.map(x => x.v)), passo = (W - sx - dx) / n, bw = Math.max(6, passo - Math.max(3, passo * 0.08));
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pz KO per reparto">
     <line x1="${sx}" x2="${W - dx}" y1="${base}" y2="${base}" stroke="#c9c9c9"/>
     ${voci.map((x, i) => {
       const h = Math.max(1, (x.v / max) * (base - top)), X = sx + i * passo + (passo - bw) / 2, cxx = X + bw / 2, tip = `<b>${esc(x.nome)}</b><br>Pz KO ${fmtN(Math.round(x.v))}`;
       return `<rect x="${X.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="#fbbf93" stroke="#f08a4b" stroke-width="1.5" data-tip="${esc(tip)}"/>`
-        + `<text x="${cxx.toFixed(1)}" y="${(base - h - 6).toFixed(1)}" font-size="${n > 14 ? 9.5 : 12}" text-anchor="middle" fill="#222">${fmtN(Math.round(x.v))}</text>`
-        + `<text transform="translate(${(cxx + 4).toFixed(1)} ${base + 12}) rotate(-35)" font-size="${n > 14 ? 10 : 12.5}" text-anchor="end" fill="#222" data-tip="${esc(tip)}">${esc(nomeCorto(x.nome).length > 14 ? nomeCorto(x.nome).slice(0, 13) + '…' : nomeCorto(x.nome))}</text>`;
+        + `<text x="${cxx.toFixed(1)}" y="${(base - h - 6).toFixed(1)}" font-size="${fs}" text-anchor="middle" fill="#222">${fmtN(Math.round(x.v))}</text>`
+        + (dritti ? `<text x="${cxx.toFixed(1)}" y="${base + fs + 6}" font-size="${fs}" text-anchor="middle" fill="#222" data-tip="${esc(tip)}">${esc(nomi[i])}</text>`
+          : `<text transform="translate(${(cxx + 4).toFixed(1)} ${base + 12}) rotate(-35)" font-size="${fs}" text-anchor="end" fill="#222" data-tip="${esc(tip)}">${esc(nomi[i])}</text>`);
     }).join('')}</svg>`;
 }
 async function impostaBorse() {
