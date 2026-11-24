@@ -142,6 +142,7 @@ table.foglio td.nr{background:#ffd4f8}
 table.foglio td.nota{background:#ffdaa3}
 table.foglio td.acc{background:#e7ff78}
 table.foglio td.sku-nota{color:#ff0000}
+table.foglio td.c-sku{color:#433dff}
 table.foglio td.solo{background:#baffe7;font-weight:700}
 table.foglio td.c-note{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 table.foglio tbody tr{cursor:default}
@@ -862,7 +863,7 @@ function classeCella(k, r) {
     case 'stato_elab': c.push('c-elab'); if (nr) c.push('no'); break;
     case 'descrizione': c.push('c-desc'); break;
     case 'pz_ko': c.push('c-pz'); if (nr) c.push('nr'); else if (acc) c.push('acc'); break;
-    case 'sku': c.push('c-centro'); if (nota) c.push('sku-nota'); if (nr) c.push('nr'); break;
+    case 'sku': c.push('c-centro', 'c-sku'); if (nr) c.push('nr'); break; // SKU in blu come la Descrizione
     case 'data': c.push('c-centro'); if (nr) c.push('nr'); else if (acc) c.push('acc'); break;
     case 'bollettino': case 'conceria': c.push('c-centro'); if (nr) c.push('nr'); break;
     case 'team_leader': c.push('c-tl'); if (nr) c.push('nr'); break;
