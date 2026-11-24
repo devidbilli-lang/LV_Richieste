@@ -236,6 +236,7 @@ table.tab-tutti td.c-manca.d{background:#fff0d6!important;box-shadow:inset 0 0 0
 table.tab-tutti tr.tt-rinf td{background:#fffaf2}
 table.foglio.tab-tutti tr.tt-sep td{height:16px;padding:0;background:#fff!important;border:0;border-top:2px solid #fb8a3c} /* spazio tra un articolo e l'altro */
 table.tab-tutti tr.tt-princ td:not(:last-child){background:#e3d9ff} /* componente principale con rinforzi: viola fino a TM, come nell'editor */
+table.tab-tutti tr.tt-princ td.c-ro:not(.c-manca){background:#d2c4fb!important;color:#3d2b7a} /* colonne calcolate: viola più scuro, come nell'editor */
 .leg-manca{display:inline-block;font-size:12px;padding:2px 9px;border-radius:6px;background:#ffd9d9;box-shadow:inset 0 0 0 1px #f2a3a3}
 .leg-manca.d{background:#fff0d6;box-shadow:inset 0 0 0 1px #f3c98a}
 @keyframes respiro{0%,100%{transform:translateY(-5px)}50%{transform:translateY(-8px)}}
@@ -2385,6 +2386,8 @@ async function eseguiImportDiba() {
 // sec. Tingitura e sec. RMA vuoti non contano come mancanti.
 const TC_COL = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz', 'n'], ['cns_area', 'CNS', 'n'], ['sec_taglio', 'sec. Taglio', 'n'], ['sec_prep', 'sec. Prep.', 'n'],
   ['sec_ting', 'sec. Ting.', 'n'], ['sec_rma', 'sec. RMA', 'n'], ['codice_materiale', 'Cod. materiale'], ['descr_materiale', 'Descr. materiale'], ['prezzo', '€', 'e'], ['tdp', 'TDP', 'n'], ['tm', 'TM']];
+// colonne che l'app ricava da sola (Distinta base, Items BC, TDP): grigie, non si compilano a mano
+const CALCOLATI = new Set(['codice_materiale', 'descr_materiale', 'prezzo', 'tdp', 'um', 'tm']);
 const DERIVATI = { codice_materiale: 'manca in Distinta base per la tipologia', prezzo: 'manca in Items BC', tdp: 'manca nella tabella TDP' };
 const vuoto = v => v === null || v === undefined || String(v).trim() === '';
 function mancantiCe(c) {
@@ -2453,11 +2456,11 @@ function disegnaTuttiCe() {
     $('#ct-art').textContent = `${fmtN(new Set(lista.map(c => c.codice_pf)).size)} articoli`;
   }
   box.innerHTML = `
-    <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}">${l}</th>`).join('')}<th>Stato</th></tr></thead>
+    <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([k, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}${CALCOLATI.has(k) ? ' c-ro' : ''}"${CALCOLATI.has(k) ? ' title="Si aggiorna da solo: non si compila a mano"' : ''}>${l}</th>`).join('')}<th>Stato</th></tr></thead>
       <tbody>${pagina.map((c, i) => `${i && c.codice_pf !== pagina[i - 1].codice_pf ? `<tr class="tt-sep"><td colspan="${TC_COL.length + 4}"></td></tr>` : ''}<tr class="clic ${c.padre ? 'tt-rinf' : c.princ ? 'tt-princ' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
         <td class="c-art"><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
         <td class="c-comp">${c.padre ? '<span class="freccia-rinf">↳</span>' : ''}${nome(c)}</td><td class="sub c-comp">${c.padre ? esc(String(c.padre).replace(c.codice_pf + '-', '')) : ''}</td>
-        ${TC_COL.map(([k, , tipo]) => `<td class="${tipo ? 'c-cifra ' : ''}${k === 'descr_materiale' ? 'c-descr ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${k === 'descr_materiale' && c[k] ? `title="${esc(c[k])}"` : ''}${DERIVATI[k] && c.manca.includes(k) ? ` title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
+        ${TC_COL.map(([k, , tipo]) => `<td class="${CALCOLATI.has(k) ? 'c-ro ' : ''}${tipo ? 'c-cifra ' : ''}${k === 'descr_materiale' ? 'c-descr ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${k === 'descr_materiale' && c[k] ? `title="${esc(c[k])}"` : ''}${DERIVATI[k] && c.manca.includes(k) ? ` title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
         <td>${c.manca.length ? `<span class="badge-manca" title="${c.manca.length} campi da completare">${c.manca.length} da compl.</span>` : '<span class="ok-txt">✓</span>'}</td></tr>`).join('')
         || `<tr><td colspan="${TC_COL.length + 4}" class="vuoto">Nessun componente</td></tr>`}</tbody></table></div>
     `;
