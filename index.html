@@ -293,7 +293,18 @@ body.con-pannello main{padding-bottom:52vh}
 .pw input{padding-right:40px}
 .pw button{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;padding:6px;color:var(--tenue)}
 
-.sotto-tab{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.sotto-tab{display:flex;gap:6px;flex-wrap:wrap}
+.db-testa{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:8px}
+#an-extra{margin-left:auto;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#an-extra input{padding:6px 10px;font-size:13px}
+#an-extra .btn{padding:6px 12px;font-size:13px}
+#an-extra .pillole button{padding:5px 11px;font-size:12.5px}
+.info-db{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1.5px solid #9a9a9a;color:#666;font-size:12px;font-weight:700;cursor:help}
+.ce-testa{margin:0 0 6px;gap:8px}
+.ce-testa h2{margin:0;font-size:17px}
+.ce-testa input{padding:5px 9px;font-size:13px}
+.ce-testa .btn{padding:5px 11px;font-size:13px}
+body.sez-grigia .tab-alta{max-height:calc(100vh - 175px)}
 .sotto-tab button{border:1px solid var(--bordo);background:#fff;border-radius:999px;padding:5px 12px;cursor:pointer;font-weight:600;font-size:13px}
 .sotto-tab button.att{background:var(--viola);color:#fff;border-color:var(--viola)}
 .progress{height:8px;background:var(--grigio-chiaro);border-radius:5px;overflow:hidden}
@@ -1997,15 +2008,16 @@ function cambiaTabDb(k) {
 }
 function vistaAnagrafiche() {
   const t = S.filtri.anaTab || 'componenti';
-  $('#vista').innerHTML = `<div class="sotto-tab">${Object.entries(TAB).map(([k, v]) => `<button class="${k === t ? 'att' : ''}" onclick="cambiaTabDb('${k}')">${v.t}</button>`).join('')}</div><div id="an-corpo"></div>`;
+  $('#vista').innerHTML = `<div class="db-testa"><div class="sotto-tab">${Object.entries(TAB).map(([k, v]) => `<button class="${k === t ? 'att' : ''}" onclick="cambiaTabDb('${k}')">${v.t}</button>`).join('')}</div>
+    <div id="an-extra" class="riga-flex"></div></div><div id="an-corpo"></div>`;
   if (t === 'componenti') return vistaComponentiDb();
-  $('#an-corpo').innerHTML = `<div class="card"><div class="riga-flex"><input id="an-q" placeholder="Cerca…" value="${esc(S.filtri.anaQ || '')}" style="max-width:320px">
-      <button class="btn" onclick="caricaAna()">Cerca</button>
-      ${t === 'distinta' ? `<input id="an-pf" list="dl-art-db" placeholder="Articolo: Codice PF o descrizione…" value="${esc(S.filtri.dibaPf || '')}" style="max-width:340px" autocomplete="off">
+  $('#an-extra').innerHTML = `<span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button>
+      <span class="sub" id="an-info"></span>
+      ${t === 'distinta' ? `<input id="an-pf" list="dl-art-db" placeholder="Articolo: Codice PF o descrizione…" value="${esc(S.filtri.dibaPf || '')}" style="width:260px" autocomplete="off">
         <datalist id="dl-art-db">${[...S.art.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([c, d]) => `<option value="${esc(c + ' — ' + (d || ''))}">`).join('')}</datalist>
         <button class="btn prim" onclick="apriImportDiba()">Importa da Excel</button>` : ''}
-      <span class="sub" id="an-info"></span><div class="spazio" style="flex:1"></div>
-      <span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button></div></div><div id="an-imp"></div><div id="an-tab"></div>`;
+      <input id="an-q" placeholder="Cerca…" value="${esc(S.filtri.anaQ || '')}" style="width:200px"><button class="btn" onclick="caricaAna()">Cerca</button>`;
+  $('#an-corpo').innerHTML = `<div id="an-imp"></div><div id="an-tab"></div>`;
   S.selAna = new Set();
   fabDb(`Aggiungi a ${TAB[t].t}`, () => editAna(null));
   if (t === 'items_bc') pannelloPbi();
@@ -2247,7 +2259,7 @@ function mancantiCe(c) {
 }
 async function caricaTuttiCe() {
   S.ct = S.ct || { q: '', vedi: 'tutti', pag: 0 };
-  if ($('#ce-elenco')) $('#ce-elenco').innerHTML = '<div class="card"><p class="sub">Carico i componenti…</p></div>';
+  if ($('#ce-elenco')) $('#ce-elenco').innerHTML = '<p class="sub" style="margin:6px 4px">Carico i componenti…</p>';
   try {
     const righe = (await api('/api/admin/componenti/tutti')).righe, padri = new Set(righe.map(c => c.padre).filter(Boolean));
     S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c), princ: !c.padre && padri.has(c.chiave) })); // princ: componente principale con rinforzi (riga viola)
@@ -2265,12 +2277,20 @@ function disegnaTuttiCe() {
   const pagina = lista.slice(t.pag * PAG, (t.pag + 1) * PAG);
   const val = (c, k, tipo) => vuoto(c[k]) ? '' : tipo === 'e' ? fmt(c[k], 2) : tipo === 'n' ? fmtN(c[k]) : esc(c[k]);
   const nome = c => esc(String(c.componente || '').replace(c.codice_pf + '-', ''));
-  box.innerHTML = `<div class="card"><div class="riga-flex">
-      <input id="ct-q" placeholder="Cerca articolo, componente, materiale…" value="${esc(t.q)}" style="max-width:340px" autocomplete="off">
-      <div class="pillole" id="ct-vedi">${[['tutti', `Tutti ${fmtN(tutte.length)}`], ['manca', `Da completare ${fmtN(nManca)}`], ['ok', `Completi ${fmtN(tutte.length - nManca)}`]].map(([k, l]) => `<button data-v="${k}" class="${t.vedi === k ? 'att' : ''}">${l}</button>`).join('')}</div>
-      <span class="sub">${fmtN(new Set(lista.map(c => c.codice_pf)).size)} articoli</span><div class="spazio" style="flex:1"></div>
-      <span class="leg-manca">da compilare</span><span class="leg-manca d">manca in Distinta / Items BC / TDP</span></div>
-    <p class="sub" style="margin:8px 0 0">0 vale come compilato; gli accessori non hanno lavorazioni, quindi non hanno celle rosse; le infustiture sono rosse solo se manca il tempo di taglio; il TDP non si segnala per infustiture e accessori; sec. Ting. e sec. RMA vuoti non contano come mancanti. Clic su una riga: si apre l'articolo sul campo da compilare.</p></div>
+  const barra = $('#ct-barra');
+  if (barra && !$('#ct-q')) { // la barra si disegna una volta: la ricerca non perde il cursore
+    barra.innerHTML = `<span class="sub" id="ct-art"></span><div class="pillole" id="ct-vedi"></div>
+      <input id="ct-q" placeholder="Cerca articolo, componente, materiale…" value="${esc(t.q)}" style="width:230px" autocomplete="off">
+      <span class="info-db" title="Rosso: da compilare nel componente. Giallo: manca in Distinta base, Items BC o TDP. 0 vale come compilato; gli accessori non hanno lavorazioni, quindi non hanno celle rosse; le infustiture sono rosse solo se manca il tempo di taglio; il TDP non si segnala per infustiture e accessori; sec. Ting. e sec. RMA vuoti non contano come mancanti. Viola: componente principale con rinforzi. Clic su una riga: si apre l'articolo sul campo da compilare.">i</span>`;
+    const qi = $('#ct-q'); let tm;
+    qi.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { t.q = qi.value; t.pag = 0; disegnaTuttiCe(); }, 250); });
+  }
+  if ($('#ct-vedi')) {
+    $('#ct-vedi').innerHTML = [['tutti', `Tutti ${fmtN(tutte.length)}`], ['manca', `Da completare ${fmtN(nManca)}`], ['ok', `Completi ${fmtN(tutte.length - nManca)}`]].map(([k, l]) => `<button data-v="${k}" class="${t.vedi === k ? 'att' : ''}">${l}</button>`).join('');
+    $$('#ct-vedi button').forEach(b => b.addEventListener('click', () => { t.vedi = b.dataset.v; t.pag = 0; disegnaTuttiCe(); }));
+    $('#ct-art').textContent = `${fmtN(new Set(lista.map(c => c.codice_pf)).size)} articoli`;
+  }
+  box.innerHTML = `
     <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}">${l}</th>`).join('')}<th>Stato</th></tr></thead>
       <tbody>${pagina.map(c => `<tr class="clic ${c.padre ? 'tt-rinf' : c.princ ? 'tt-princ' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
         <td class="c-art"><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
@@ -2282,9 +2302,6 @@ function disegnaTuttiCe() {
       ${t.pag > 0 ? '<button class="btn" onclick="S.ct.pag--;disegnaTuttiCe()">← Precedenti</button>' : ''}
       <span class="sub">${fmtN(t.pag * PAG + 1)}-${fmtN(Math.min(lista.length, (t.pag + 1) * PAG))} di ${fmtN(lista.length)}</span>
       ${(t.pag + 1) * PAG < lista.length ? '<button class="btn" onclick="S.ct.pag++;disegnaTuttiCe()">Successivi →</button>' : ''}</div>` : ''}`;
-  $$('#ct-vedi button').forEach(b => b.addEventListener('click', () => { t.vedi = b.dataset.v; t.pag = 0; disegnaTuttiCe(); }));
-  const qi = $('#ct-q'); let tm;
-  qi.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { t.q = qi.value; t.pag = 0; disegnaTuttiCe(); const n = $('#ct-q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); });
   $('#ce-elenco tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) apriDaTutti(tr.dataset.pf, Number(tr.dataset.id)); });
 }
 // dalla tabella completa all'editor dell'articolo, col cursore sul primo campo da compilare del componente
@@ -2304,8 +2321,8 @@ function modoCe(m) {
   S.ceModo = m;
   $$('#ce-modo button').forEach(b => b.classList.toggle('att', b.dataset.m === m));
   $('#ce-art').classList.toggle('nascosto', m !== 'articolo');
+  $('#ct-barra').classList.toggle('nascosto', m !== 'tutti');
   $('#ce-out').classList.toggle('nascosto', m !== 'articolo');
-  $('#ce-aiuto').classList.toggle('nascosto', m !== 'articolo');
   $('#ce-elenco').classList.toggle('nascosto', m !== 'tutti'); // (id diverso dalla casella «seleziona tutte» dell'editor, #ce-tutti)
   if ($('#db-fab')) $('#db-fab').classList.toggle('nascosto', m !== 'articolo');
   if (m === 'tutti') caricaTuttiCe();
@@ -2317,15 +2334,13 @@ const TIPOLOGIE_BASE = ['MATERIALE#1', 'MATERIALE#2', 'MATERIALE#3', 'MATERIALE#
   ...Array.from({ length: 12 }, (_, i) => 'ACCESSORIO#' + (i + 1)), 'Borse Complete'];
 let ceUid = 0;
 function vistaComponentiDb() {
-  $('#an-corpo').innerHTML = `<div class="card"><div class="riga-flex" style="align-items:flex-end">
-      <div class="pillole" id="ce-modo" style="align-self:flex-end;margin-bottom:2px"><button data-m="articolo">Per articolo</button><button data-m="tutti">Tutti i componenti</button></div>
-      <div class="riga-flex" id="ce-art" style="align-items:flex-end">
-      <label class="campo" style="min-width:280px">Articolo<input id="ce-pf" list="dl-articoli-tutti" placeholder="Codice PF (es. M14019)…" autocomplete="off" value="${esc(S.ce ? S.ce.pf : '')}"></label>
-      <button class="btn prim" onclick="apriArticoloDb()">Apri</button></div>
-      <div class="spazio" style="flex:1"></div>
-      <span class="sub" style="max-width:420px">Codice materiale, €, TDP, UM e TM si aggiornano da soli quando cambiano Distinta base, Items BC o TDP.</span></div>
-    <p class="sub" id="ce-aiuto" style="margin:8px 0 0">Per un articolo nuovo scrivi il codice e premi Apri. I componenti si scrivono direttamente nella tabella: Invio passa alla riga sotto (e ne crea una nuova in fondo), e puoi incollare più righe copiate da Excel.</p></div>
-    <div id="ce-out"></div><div id="ce-elenco" class="nascosto"></div>`;
+  $('#an-extra').innerHTML = `<span class="riga-flex" id="ce-art" style="gap:6px">
+      <input id="ce-pf" list="dl-articoli-tutti" placeholder="Articolo: Codice PF (es. M14019)…" autocomplete="off" value="${esc(S.ce ? S.ce.pf : '')}" style="width:250px">
+      <button class="btn prim" onclick="apriArticoloDb()">Apri</button>
+      <span class="info-db" id="ce-aiuto" title="Per un articolo nuovo scrivi il codice e premi Apri. I componenti si scrivono direttamente nella tabella: Invio passa alla riga sotto (e ne crea una nuova in fondo), e puoi incollare più righe copiate da Excel. Codice materiale, €, TDP, UM e TM si aggiornano da soli quando cambiano Distinta base, Items BC o TDP.">i</span></span>
+    <span class="riga-flex nascosto" id="ct-barra" style="gap:6px"></span>
+    <div class="pillole" id="ce-modo"><button data-m="articolo">Per articolo</button><button data-m="tutti">Tutti i componenti</button></div>`;
+  $('#an-corpo').innerHTML = `<div id="ce-out"></div><div id="ce-elenco" class="nascosto"></div>`;
   let dl = $('#dl-articoli-tutti');
   if (!dl) { dl = document.createElement('datalist'); dl.id = 'dl-articoli-tutti'; document.body.appendChild(dl); }
   dl.innerHTML = [...S.art.entries()].map(([k, v]) => `<option value="${esc(k + ' — ' + (v || ''))}">`).join('');
@@ -2378,15 +2393,15 @@ function disegnaCe() {
   const tip = [...new Set([...c.tipologie, ...TIPOLOGIE_BASE])];
   const nRinf = uid => c.righe.filter(r => r.padreUid === uid).length;
   box.innerHTML = `<datalist id="dl-tipologie">${tip.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
-    <div class="card"><div class="riga-flex">
-      <h2 style="margin:0">${esc(c.pf)}</h2>
+    <div class="riga-flex ce-testa">
+      <h2>${esc(c.pf)}</h2>
       <input id="ce-descr" value="${esc(c.descr)}" placeholder="Descrizione articolo${c.nuovo ? ' (obbligatoria per il nuovo articolo)' : ''}" style="max-width:420px">
       ${c.nuovo ? '<span class="badge b-da">articolo nuovo</span>' : ''}
       <span class="sub">${fmtN(c.righe.filter(r => !r.padreUid).length)} componenti · ${(n => n + (n === 1 ? ' rinforzo' : ' rinforzi'))(c.righe.filter(r => r.padreUid).length)}</span>
       <div class="spazio" style="flex:1"></div>
       ${c.righe.some(r => !r.padreUid && /rinf/i.test(r.componente)) ? '<button class="btn" onclick="collegaRinforziAuto()" title="Collega ogni rinforzo al componente principale che lo precede">Collega rinforzi</button>' : ''}
       <button class="btn peric nascosto" id="ce-elimina" onclick="eliminaSelCe()"></button>
-      <button class="btn" onclick="incollaCe()">Incolla da Excel</button></div></div>
+      <button class="btn" onclick="incollaCe()">Incolla da Excel</button></div>
     <div class="tabwrap tab-alta"><table class="foglio tab-ce"><thead><tr>
       <th class="c-sel"><input type="checkbox" id="ce-tutti" title="Seleziona tutte le righe"></th><th>#</th><th>Componente</th><th>Rinforzo di</th><th>#Materiale</th><th>N° pz</th><th>CNS area</th><th>sec. Taglio</th><th>sec. Prep.</th><th>sec. Ting.</th><th>sec. RMA</th>
       <th class="c-ro" title="Si aggiorna da solo: non si modifica">Cod. materiale</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">Descrizione materiale</th><th class="n c-ro" title="Si aggiorna da solo: non si modifica">€</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">TM</th><th></th></tr></thead>
