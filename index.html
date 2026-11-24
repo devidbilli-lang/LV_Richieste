@@ -364,13 +364,13 @@ tr.sel td{background:#fff4d6!important}
 .da-pan{border:3px solid #fb8a3c;border-radius:10px;background:#fff;padding:10px 12px;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative}
 .da-pan h3{margin:0 0 4px;text-align:center;font-size:25px;font-weight:800}
 .da-scroll{flex:1;min-height:0;overflow:auto}
-.da-tab{width:100%;border-collapse:collapse}
-.da-tab th{position:sticky;top:0;z-index:1;background:#fcd5b4;color:#111;font-style:normal;font-weight:500;font-size:15px;padding:7px 8px;border:0;text-align:center;white-space:nowrap}
-.da-tab td{padding:3px 8px;border:0;text-align:center;white-space:nowrap;font-size:15px}
+.da-tab{width:100%;border-collapse:collapse;font-size:15px}
+.da-tab th{position:sticky;top:0;z-index:1;background:#fcd5b4;color:#111;font-style:normal;font-weight:500;font-size:1em;line-height:1.15;padding:.4em .5em;border:0;text-align:center}
+.da-tab td{padding:.22em .5em;border:0;text-align:center;white-space:nowrap;font-size:1em;line-height:1.2}
 .da-tab .sx{text-align:left}
 .da-tab td.sx{max-width:260px;overflow:hidden;text-overflow:ellipsis}
 .da-tab.adatta td.sx{max-width:0} /* i testi lunghi si accorciano: il Totale resta sempre nel riquadro */
-.da-tab td.comp{color:#555;font-size:13px}
+.da-tab td.comp{color:#555;font-size:.86em}
 .da-tab tbody tr:nth-child(even) td{background:#fde9d9}
 .da-tab .eur{color:#e60000}
 .da-tab tfoot td{position:sticky;bottom:0;background:#fbff7a;border-top:2px solid #fb8a3c}
@@ -1725,6 +1725,25 @@ function disegnaAnalytics() {
   $('#da-mot').innerHTML = tabEur('<th class="sx" style="width:56%">Motivazione</th><th class="sx" style="width:30%">Componente</th>', d.motivazioni,
     x => `<td class="sx" title="${esc(x.motivazione || '')}">${esc(x.motivazione || '')}</td><td class="sx comp" title="${esc(x.componente || '')}">${esc(x.componente || '')}</td>`);
   $('#da-descr').innerHTML = tabEur('<th class="sx">Descrizione</th>', d.descrizioni, x => `<td class="sx" title="${esc(x.nome || '')}">${esc(x.nome || '')}</td>`);
+  adattaTabelleDa();
+}
+// tabelle: il carattere si ingrandisce finché la tabella riempie il riquadro, così i valori occupano la cella.
+// Responsabilità deve stare tutta nel riquadro (larghezza e altezza); Motivazione e Descrizione scorrono in verticale:
+// il Totale deve restare visibile e al massimo una riga su 10 può avere il testo accorciato (passandoci sopra si legge intero).
+function adattaTabelleDa() {
+  for (const [id, alto, min, max] of [['#da-resp', true, 13, 24], ['#da-mot', false, 15, 19], ['#da-descr', false, 15, 19]]) {
+    const box = $(id), t = box && box.querySelector('table'); if (!t || !box.clientWidth) continue;
+    const celle = [...t.querySelectorAll('tbody td.sx')].slice(0, 300);
+    const ok = fs => {
+      t.style.fontSize = fs + 'px';
+      if (t.offsetWidth > box.clientWidth + 1) return false;
+      if (alto) return t.offsetHeight <= box.clientHeight + 1 && !celle.some(c => c.scrollWidth > c.clientWidth + 1);
+      return celle.filter(c => c.scrollWidth > c.clientWidth + 1).length <= celle.length / 10;
+    };
+    let lo = min, hi = max;
+    if (ok(hi)) lo = hi; else while (hi - lo > 0.25) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+    t.style.fontSize = lo + 'px';
+  }
 }
 // i grafici si disegnano alla misura reale del riquadro: la torta e le barre lo riempiono e il testo resta sempre della stessa grandezza
 function disegnaGraficiDa() {
@@ -1732,7 +1751,7 @@ function disegnaGraficiDa() {
   t.innerHTML = svgTorta(g.torta, g.totPz, t.clientWidth, t.clientHeight);
   b.innerHTML = svgBarre(g.reparti, b.clientWidth, b.clientHeight);
 }
-window.addEventListener('resize', () => { clearTimeout(S.tmGraf); S.tmGraf = setTimeout(disegnaGraficiDa, 120); });
+window.addEventListener('resize', () => { clearTimeout(S.tmGraf); S.tmGraf = setTimeout(() => { disegnaGraficiDa(); adattaTabelleDa(); }, 120); });
 // larghezza reale del testo (stesso font della pagina): le etichette si accorciano solo se davvero non ci stanno
 const larghezzaTesto = (s, fs) => { const c = larghezzaTesto.c || (larghezzaTesto.c = document.createElement('canvas').getContext('2d')); c.font = `${fs}px ${getComputedStyle(document.body).fontFamily}`; return c.measureText(String(s)).width; };
 const taglia = (s, maxW, fs) => { s = String(s); if (larghezzaTesto(s, fs) <= maxW) return s; while (s.length > 2 && larghezzaTesto(s + '…', fs) > maxW) s = s.slice(0, -1); return s + '…'; };
