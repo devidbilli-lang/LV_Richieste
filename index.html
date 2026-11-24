@@ -770,13 +770,34 @@ async function controllaNovita() {
   if (!S.token || document.hidden || S.controllo) return;
   S.controllo = true;
   try {
-    const { v } = await api('/api/versione');
-    if (S.versione === undefined) S.versione = v;
-    else if (v !== S.versione) { S.versione = v; S.novita = true; if (isMag()) aggiornaContaElabora(); }
+    const { v, a } = await api('/api/versione');
+    if (S.versione === undefined) { S.versione = v; S.versioneAna = a; }
+    else {
+      if (v !== S.versione) { S.versione = v; S.novita = true; if (isMag()) aggiornaContaElabora(); }
+      if (a !== S.versioneAna) { S.versioneAna = a; S.anaVecchie = true; if (S.nuove && S.nuove.length) aggiornaAnaSeServe(); }
+    }
   } catch (e) {}
   finally { S.controllo = false; }
   if (S.novita) aggiornaDaAltri();
 }
+// Anagrafiche cambiate (articolo, componente, motivazione, operatore nuovi…): si ricaricano quando servono davvero, cioè appena
+// l'utente entra in una casella per inserire dati, apre una riga o cambia sezione (non a ogni salvataggio: sono migliaia di righe).
+const SEZ_DB = ['anagrafiche', 'profili', 'import'];
+async function aggiornaAnaSeServe() {
+  if (!S.anaVecchie || S.caricoAna || SEZ_DB.includes(S.vista)) return;
+  S.caricoAna = true;
+  try {
+    await caricaAnagrafiche(); S.anaVecchie = false;
+    // righe nuove già aperte: il menu Componente si aggiorna se l'articolo ora ha componenti (o ne ha di nuovi)
+    $$('#r-tab tr.riga-nuova').forEach(tr => {
+      const n = S.nuove[Number(tr.dataset.n)], sel = $('select[data-f="componente"]', tr); if (!n || !sel || !n.sku) return;
+      const comps = S.compPerPf.get(n.sku) || [];
+      sel.innerHTML = opzioniComponenti(comps.length ? n.sku : '', n.componente); sel.disabled = !comps.length;
+    });
+  } catch (e) {}
+  finally { S.caricoAna = false; }
+}
+document.addEventListener('focusin', e => { if (S.anaVecchie && e.target.matches && e.target.matches('input, select, textarea')) aggiornaAnaSeServe(); });
 function avviaNovita() {
   if (S.tmNovita) return;
   S.tmNovita = setInterval(controllaNovita, SECONDI_NOVITA * 1000);
@@ -805,6 +826,7 @@ function vai(v) {
   const f = { foglio: vistaFoglio, elabora: vistaElabora, avanzamento: vistaAvanzamento, modulo: vistaModulo, responsabilita: vistaResponsabilita, analytics: vistaAnalytics, anagrafiche: vistaAnagrafiche, profili: vistaProfili, import: vistaImport }[v];
   $('#vista').innerHTML = '';
   f();
+  aggiornaAnaSeServe(); // se nel frattempo sono cambiate le anagrafiche
 }
 async function aggiornaContaElabora() {
   try {
