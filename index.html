@@ -2630,11 +2630,12 @@ async function selezionaTutteAna() {
 }
 async function eliminaSelAna() {
   const t = S.filtri.anaTab, ids = [...S.selAna];
-  if (!ids.length || !confirm(`Eliminare ${fmtN(ids.length)} righe da ${TAB[t].t}? L'operazione non si può annullare.`)) return;
+  const avviso = t === 'articoli' ? '\nVerranno eliminati anche tutti i loro componenti.' : '';
+  if (!ids.length || !confirm(`Eliminare ${fmtN(ids.length)} righe da ${TAB[t].t}?${avviso} L'operazione non si può annullare.`)) return;
   try {
-    let fatte = 0;
-    for (let i = 0; i < ids.length; i += 1000) fatte += (await api('/api/admin/tabella/' + t + '/elimina', { method: 'POST', body: { ids: ids.slice(i, i + 1000) } })).eliminate;
-    S.selAna.clear(); toast(`${fmtN(fatte)} righe eliminate`, 'ok'); caricaAna(S.filtri.anaOff || 0, { mantieni: true }); caricaAnagrafiche();
+    let fatte = 0, comp = 0;
+    for (let i = 0; i < ids.length; i += 1000) { const r = await api('/api/admin/tabella/' + t + '/elimina', { method: 'POST', body: { ids: ids.slice(i, i + 1000) } }); fatte += r.eliminate; comp += r.componenti || 0; }
+    S.selAna.clear(); toast(`${fmtN(fatte)} righe eliminate${comp ? ` · ${fmtN(comp)} componenti eliminati` : ''}`, 'ok'); caricaAna(S.filtri.anaOff || 0, { mantieni: true }); caricaAnagrafiche();
   } catch (e) { toast(e.message, 'err'); }
 }
 function editAna(i) {
@@ -2657,9 +2658,9 @@ async function salvaAna(id) {
   } catch (e) { toast(e.message, 'err'); }
 }
 async function delAna(id) {
-  if (!confirm('Eliminare questo record?')) return;
   const t = S.filtri.anaTab || 'componenti';
-  try { await api(`/api/admin/tabella/${t}/${id}`, { method: 'DELETE' }); chiudiModale(); toast('Eliminato', 'ok'); caricaAna(S.filtri.anaOff || 0, { mantieni: true }); caricaAnagrafiche(); }
+  if (!confirm(t === 'articoli' ? 'Eliminare questo articolo e tutti i suoi componenti?' : 'Eliminare questo record?')) return;
+  try { const r = await api(`/api/admin/tabella/${t}/${id}`, { method: 'DELETE' }); chiudiModale(); toast(r.componenti ? `Eliminato · ${fmtN(r.componenti)} componenti eliminati` : 'Eliminato', 'ok'); caricaAna(S.filtri.anaOff || 0, { mantieni: true }); caricaAnagrafiche(); }
   catch (e) { toast(e.message, 'err'); }
 }
 
