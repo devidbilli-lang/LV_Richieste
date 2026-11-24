@@ -2149,7 +2149,7 @@ const TAB = {
     ['sec_taglio', 'sec. Taglio', 'n'], ['sec_prep', 'sec. Preparazione', 'n'], ['sec_ting', 'sec. Tingitura', 'n'], ['sec_rma', 'sec. RMA', 'n'],
     ['codice_materiale', 'Codice materiale', 'ro'], ['descr_materiale', 'Descr. materiale', 'ro'], ['um', 'UM', 'ro'], ['prezzo', '€', 'ro'], ['tdp', 'TDP', 'ro'], ['tm', 'TM', 'ro']] },
   distinta: { t: 'Distinta base (LV)', c: [['codice_pf', 'Codice PF'], ['articolo', 'Articolo'], ['codice_materiale', 'Codice materiale'], ['descr_materiale', 'Descrizione materiale'],
-    ['um', 'UM'], ['consumo', 'Consumo', 'n'], ['tipologia', 'Tipologia'], ['prezzo_budget', '€ budget', 'n'], ['note', 'Note']] },
+    ['um', 'UM'], ['consumo', 'Consumo', 'n'], ['tipologia', 'Tipologia'], ['note', 'Note']] },
   tdp: { t: 'TDP', c: [['codice', 'Codice materiale'], ['tdp', 'TDP', 'n']] },
   items_bc: { t: 'Items BC', c: [['item_brand', 'Brand'], ['codice', 'Codice'], ['descrizione', 'Descrizione'], ['prezzo', 'Prezzo', 'n'], ['um', 'UM'], ['tipo_categoria', 'Tipo categoria'],
     ['categoria', 'Categoria'], ['brand_categoria', 'Brand categoria'], ['collezione', 'Collezione']] },
@@ -2269,7 +2269,7 @@ async function aggiornaPbi() {
 const CAMPI_DIBA = [['codice_materiale', 'Codice materiale', ['codice materiale', 'cod materiale', 'codice componente', 'materiale']],
   ['descr_materiale', 'Descrizione materiale', ['descrizione materiale', 'descr materiale', 'descrizione componente']], ['um', 'UM', ['um', 'u m', 'unita di misura', 'unità di misura']],
   ['consumo', 'Consumo', ['consumo', 'quantita', 'quantità', 'qta', 'qty']], ['tipologia', 'Tipologia', ['tipologia materiale', 'tipologia']],
-  ['prezzo_budget', '€ budget', ['prezzo budget', '€ prezzo budget', '€ budget', 'prezzo']], ['note', 'Note', ['note']]];
+  ['note', 'Note', ['note']]];
 const normIntest = v => String(v ?? '').toLowerCase().replace(/[€.\-_/]/g, ' ').replace(/\s+/g, ' ').trim();
 function apriImportDiba() {
   S.diba = null;
