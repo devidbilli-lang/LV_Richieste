@@ -2270,12 +2270,11 @@ async function caricaTuttiCe() {
 }
 function disegnaTuttiCe() {
   const t = S.ct, box = $('#ce-elenco'); if (!box || !t.righe) return;
-  const q = t.q.trim().toLowerCase(), PAG = 300;
+  const q = t.q.trim().toLowerCase();
   const tutte = t.righe.filter(c => !q || (c.codice_pf + ' ' + c.componente + ' ' + (S.art.get(c.codice_pf) || '') + ' ' + (c.n_materiale || '') + ' ' + (c.codice_materiale || '')).toLowerCase().includes(q));
   const lista = tutte.filter(c => t.vedi === 'tutti' || (t.vedi === 'manca' ? c.manca.length : !c.manca.length));
   const nManca = tutte.filter(c => c.manca.length).length;
-  t.pag = Math.min(t.pag, Math.max(0, Math.ceil(lista.length / PAG) - 1));
-  const pagina = lista.slice(t.pag * PAG, (t.pag + 1) * PAG);
+  const pagina = lista; // tutte le righe in un'unica tabella da scorrere
   const val = (c, k, tipo) => vuoto(c[k]) ? '' : tipo === 'e' ? fmt(c[k], 2) : tipo === 'n' ? fmtN(c[k]) : esc(c[k]);
   const nome = c => esc(String(c.componente || '').replace(c.codice_pf + '-', ''));
   const barra = $('#ct-barra');
@@ -2299,10 +2298,7 @@ function disegnaTuttiCe() {
         ${TC_COL.map(([k, , tipo]) => `<td class="${tipo ? 'c-cifra ' : ''}${k === 'descr_materiale' ? 'c-descr ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${k === 'descr_materiale' && c[k] ? `title="${esc(c[k])}"` : ''}${DERIVATI[k] && c.manca.includes(k) ? ` title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
         <td>${c.manca.length ? `<span class="badge-manca" title="${c.manca.length} campi da completare">${c.manca.length} da compl.</span>` : '<span class="ok-txt">✓</span>'}</td></tr>`).join('')
         || `<tr><td colspan="${TC_COL.length + 4}" class="vuoto">Nessun componente</td></tr>`}</tbody></table></div>
-    ${lista.length > PAG ? `<div class="riga-flex" style="justify-content:center;margin:10px">
-      ${t.pag > 0 ? '<button class="btn" onclick="S.ct.pag--;disegnaTuttiCe()">← Precedenti</button>' : ''}
-      <span class="sub">${fmtN(t.pag * PAG + 1)}-${fmtN(Math.min(lista.length, (t.pag + 1) * PAG))} di ${fmtN(lista.length)}</span>
-      ${(t.pag + 1) * PAG < lista.length ? '<button class="btn" onclick="S.ct.pag++;disegnaTuttiCe()">Successivi →</button>' : ''}</div>` : ''}`;
+    `;
   $('#ce-elenco tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) apriDaTutti(tr.dataset.pf, Number(tr.dataset.id)); });
 }
 // dalla tabella completa all'editor dell'articolo, col cursore sul primo campo da compilare del componente
