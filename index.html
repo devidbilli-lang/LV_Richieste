@@ -166,6 +166,7 @@ tr.riga-nuova td.c-desc,tr.riga-nuova td.c-tl input{font-style:italic}
 tr.riga-nuova select:disabled{opacity:.55}
 tr.riga-nuova .errato{border:2px solid var(--rosso)!important;background:#fff0f0!important}
 tr.riga-nuova td{position:relative}
+tr.riga-nuova td.c-auto{background:#e6e6e6!important;color:#555;font-style:normal} /* righe nuove: celle che si compilano da sole (non a mano) */
 .replica{position:absolute;top:2px;right:2px;z-index:2;display:none;width:20px;height:20px;border-radius:50%;border:1.5px solid #fb8a3c;background:#fff;color:#e0701f;font-size:12px;font-weight:700;line-height:16px;padding:0;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .replica:hover{background:#fb8a3c;color:#fff}
 tr.riga-nuova td:hover .replica,tr.riga-nuova td:focus-within .replica{display:block}
@@ -1059,9 +1060,12 @@ function cellaNuovaBase(n, k) {
     default: return '';
   }
 }
+// righe nuove: colonne che l'app compila da sola (grigie, come le colonne calcolate del Database)
+const AUTO_NUOVA = { scheda: 'È la scheda scelta in alto', numero: 'Lo assegna il magazzino', descrizione: 'Si compila da sola dallo SKU', responsabilita: 'Si compila da sola dalla motivazione',
+  minuti: 'Si calcola al salvataggio', totale_eur: 'Si calcola al salvataggio', stato: 'Si calcola da solo' };
 function rigaNuovaHtml(n, j, cols) {
   const r = pseudoRiga(n);
-  return `<tr class="riga-3d riga-nuova" data-n="${j}">${cols.map(c => `<td data-k="${c[0]}" class="${c[2] === 'n' ? 'n ' : ''}${classeCella(c[0], r)}">${cellaNuova(n, c[0])}</td>`).join('')}
+  return `<tr class="riga-3d riga-nuova" data-n="${j}">${cols.map(c => `<td data-k="${c[0]}" class="${c[2] === 'n' ? 'n ' : ''}${classeCella(c[0], r)}${AUTO_NUOVA[c[0]] ? ' c-auto' : ''}"${AUTO_NUOVA[c[0]] ? ` title="${AUTO_NUOVA[c[0]]}"` : ''}>${cellaNuova(n, c[0])}</td>`).join('')}
     <td style="white-space:nowrap"><button class="icona" title="Duplica questa riga con tutti i valori" onclick="duplicaNuova(${j})">⧉</button><button class="icona" title="Togli questa riga" onclick="togliNuova(${j})">✕</button></td></tr>`;
 }
 function ridisegnaNuoveFermo() { // ridisegna le righe senza perdere la posizione nella tabella
@@ -1091,7 +1095,7 @@ function aggiornaCelleNuova(tr, n) { // colori, descrizione, responsabilità, st
   const r = pseudoRiga(n);
   $$('td[data-k]', tr).forEach(td => {
     const k = td.dataset.k;
-    td.className = (td.classList.contains('n') ? 'n ' : '') + classeCella(k, r);
+    td.className = (td.classList.contains('n') ? 'n ' : '') + classeCella(k, r) + (AUTO_NUOVA[k] ? ' c-auto' : '');
     if (['descrizione', 'responsabilita', 'stato'].includes(k)) td.innerHTML = cellaNuova(n, k);
   });
 }
