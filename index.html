@@ -201,12 +201,16 @@ body.con-nuove #toast{bottom:96px}
 .carica-logo input{display:none}
 @media (max-width:900px){.testata-data{font-size:13px;padding-left:18px}.testata-img{height:22px}.logo-caricato{max-height:44px;max-width:140px}.logo-centro{margin:0 6px}.seg{height:4px}.seg.corto{flex-basis:14px}.carica-logo{padding:6px 10px;font-size:12px;margin:0 4px}.filtro-cerca input{width:150px}}
 .rinf-badge{display:inline-block;margin-left:6px;font-size:11px;font-style:normal;background:#fff2dc;color:#a86400;border-radius:999px;padding:1px 7px;font-weight:600;cursor:help}
-.tab-ce td{padding:2px 2px;height:auto;font-size:12px}
-.tab-ce input,.tab-ce select{padding:3px 5px;font-size:12px;border:1px solid #c9c9c9;border-radius:5px;background:#fff;font-family:inherit}
+.tab-ce{table-layout:fixed;min-width:1150px} /* colonne a larghezza stabilita: sotto i 1150 px la tabella scorre di lato */
+table.foglio.tab-ce td{padding:3px 4px;height:auto;font-size:13px}
+.tab-ce td.c-ro{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab-ce input:not([type=checkbox]),.tab-ce select{width:100%;box-sizing:border-box;padding:5px 5px;font-size:13px;border:1px solid #c9c9c9;border-radius:5px;background:#fff;font-family:inherit;text-overflow:ellipsis}
+.tab-ce td.ce-nome{white-space:nowrap}
+.tab-ce tr.ce-rinf td.ce-nome input{width:calc(100% - 22px)}
 table.foglio.tab-ce th{font-size:11px;padding:4px 3px;white-space:normal;line-height:1.15;font-style:normal;font-weight:600}
 .tab-ce .btn.picc{padding:2px 6px;font-size:11px}
 .tab-ce tr.ce-rinf td{background:#fff8ea}
-.tab-ce tr.ce-rinf td.ce-nome{padding-left:22px}
+table.foglio.tab-ce tr.ce-rinf td.ce-nome{padding-left:8px}
 .tab-ce .freccia-rinf{color:#a86400;font-weight:800;margin-right:6px}
 .tab-ce tr.ce-mod td:first-child{box-shadow:inset 4px 0 0 #f0a500}
 .tab-ce tr.ce-nuova td{background:#fff6ef}
@@ -2479,17 +2483,18 @@ function disegnaCe() {
       ${c.righe.some(r => !r.padreUid && /rinf/i.test(r.componente)) ? '<button class="btn" onclick="collegaRinforziAuto()" title="Collega ogni rinforzo al componente principale che lo precede">Collega rinforzi</button>' : ''}
       <button class="btn peric nascosto" id="ce-elimina" onclick="eliminaSelCe()"></button>
       <button class="btn" onclick="incollaCe()">Incolla da Excel</button></div>
-    <div class="tabwrap tab-alta"><table class="foglio tab-ce"><thead><tr>
+    <div class="tabwrap tab-alta"><table class="foglio tab-ce"><colgroup><col style="width:34px"><col style="width:38px"><col style="width:14%"><col style="width:10.6%"><col style="width:10.6%">
+      ${CE_NUM.map(k => `<col style="width:${k === 'n_pz' ? 3.8 : k === 'cns_area' ? 5 : 4.3}%">`).join('')}<col style="width:5.5%"><col><col style="width:4%"><col style="width:7.8%"><col style="width:112px"></colgroup><thead><tr>
       <th class="c-sel"><input type="checkbox" id="ce-tutti" title="Seleziona tutte le righe"></th><th>#</th><th>Componente</th><th>Rinforzo di</th><th>#Materiale</th><th>N° pz</th><th>CNS area</th><th>sec. Taglio</th><th>sec. Prep.</th><th>sec. Ting.</th><th>sec. RMA</th>
       <th class="c-ro" title="Si aggiorna da solo: non si modifica">Cod. materiale</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">Descrizione materiale</th><th class="n c-ro" title="Si aggiorna da solo: non si modifica">€</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">TM</th><th></th></tr></thead>
     <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : nRinf(r.uid) ? 'ce-princ' : ''} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
       <td class="c-sel"><input type="checkbox" data-sel="${r.uid}" ${c.sel && c.sel.has(r.uid) ? 'checked' : ''}></td>
       <td class="sub c-centro">${i + 1}</td>
-      <td class="ce-nome">${r.padreUid ? '<span class="freccia-rinf">↳</span>' : ''}<input data-f="componente" value="${esc(r.componente)}" style="width:${r.padreUid ? 106 : 124}px" placeholder="${r.padreUid ? 'Nome rinforzo' : 'Nome componente'}"></td>
-      <td><select data-f="padre" style="width:96px"><option value="">— principale —</option>${principaliCe(r.uid).filter(p => !nRinf(r.uid) || p.uid === r.padreUid).map(p => `<option value="${p.uid}" ${p.uid === r.padreUid ? 'selected' : ''}>${esc(p.componente)}</option>`).join('')}</select></td>
-      <td><input data-f="n_materiale" list="dl-tipologie" value="${esc(r.n_materiale)}" style="width:96px"></td>
-      ${CE_NUM.map(k => `<td><input data-f="${k}" inputmode="decimal" value="${esc(String(r[k] ?? '').replace('.', ','))}" style="width:${k === 'cns_area' ? 52 : 44}px"></td>`).join('')}
-      <td class="sub c-ro">${esc(r.codice_materiale || '')}</td><td class="sub c-ro" style="max-width:110px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.descr_materiale || '')}">${esc(r.descr_materiale || '')}</td>
+      <td class="ce-nome">${r.padreUid ? '<span class="freccia-rinf">↳</span>' : ''}<input data-f="componente" value="${esc(r.componente)}" title="${esc(r.componente)}" placeholder="${r.padreUid ? 'Nome rinforzo' : 'Nome componente'}"></td>
+      <td><select data-f="padre"><option value="">— principale —</option>${principaliCe(r.uid).filter(p => !nRinf(r.uid) || p.uid === r.padreUid).map(p => `<option value="${p.uid}" ${p.uid === r.padreUid ? 'selected' : ''}>${esc(p.componente)}</option>`).join('')}</select></td>
+      <td><input data-f="n_materiale" list="dl-tipologie" value="${esc(r.n_materiale)}"></td>
+      ${CE_NUM.map(k => `<td><input data-f="${k}" inputmode="decimal" value="${esc(String(r[k] ?? '').replace('.', ','))}"></td>`).join('')}
+      <td class="sub c-ro">${esc(r.codice_materiale || '')}</td><td class="sub c-ro ce-descr" title="${esc(r.descr_materiale || '')}">${esc(r.descr_materiale || '')}</td>
       <td class="n sub c-ro">${fmt(r.prezzo, 2)}</td><td class="sub c-ro">${esc(r.tm || '')}</td>
       <td style="white-space:nowrap">${r.padreUid ? '' : `<button class="btn picc" onclick="aggiungiRinforzo(${r.uid})" title="Aggiungi un rinforzo sotto questo componente">+ rinf.</button>`}
         <button class="icona" title="Elimina" onclick="togliCe(${r.uid})">✕</button></td></tr>`).join('')}</tbody></table></div>
