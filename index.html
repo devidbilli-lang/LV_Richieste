@@ -2426,6 +2426,7 @@ async function caricaTuttiCe(daCache) {
 function ripristinaTuttiCe() {
   const r = S.ctRitorno; S.ctRitorno = null; if (!r) return;
   const w = $('#ce-elenco .tabwrap'); if (!w) return;
+  if (S.ct.altreTt && S.ct.lista) { const k = S.ct.lista.findIndex(c => c.id === r.id || (c.codice_pf === r.pf && c.componente === r.comp)); S.ct.altreTt(Math.max(k + 80, Math.ceil((r.top + w.clientHeight) / 20))); }
   w.scrollTop = r.top; w.scrollLeft = r.left; window.scrollTo(0, r.y);
   let tr = $(`#ce-elenco tr[data-id="${r.id}"]`);
   if (!tr && r.comp) { const x = (S.ct.righe || []).find(c => c.codice_pf === r.pf && c.componente === r.comp); if (x) tr = $(`#ce-elenco tr[data-id="${x.id}"]`); } // dopo il salvataggio gli id cambiano
@@ -2438,6 +2439,7 @@ function tornaATuttiCe() {
   modoCe('tutti', !r.salvato); // se nel frattempo hai salvato, la tabella si ricarica
   apriArticoloDb(pf); // l'editor (nascosto) torna alla versione salvata
 }
+const PASSO_TT = 250; // righe di «Tutti i componenti» disegnate per volta
 function disegnaTuttiCe() {
   const t = S.ct, box = $('#ce-elenco'); if (!box || !t.righe) return;
   const q = t.q.trim().toLowerCase();
@@ -2460,15 +2462,22 @@ function disegnaTuttiCe() {
     $$('#ct-vedi button').forEach(b => b.addEventListener('click', () => { t.vedi = b.dataset.v; t.pag = 0; disegnaTuttiCe(); }));
     $('#ct-art').textContent = `${fmtN(new Set(lista.map(c => c.codice_pf)).size)} articoli`;
   }
-  box.innerHTML = `
-    <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([k, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}${CALCOLATI.has(k) ? ' c-ro' : ''}"${CALCOLATI.has(k) ? ' title="Si aggiorna da solo: non si compila a mano"' : ''}>${l}</th>`).join('')}<th>Stato</th></tr></thead>
-      <tbody>${pagina.map((c, i) => `${i && c.codice_pf !== pagina[i - 1].codice_pf ? `<tr class="tt-sep"><td colspan="${TC_COL.length + 4}"></td></tr>` : ''}<tr class="clic ${c.padre ? 'tt-rinf' : c.princ ? 'tt-princ' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
+  // si disegnano le prime righe e le altre man mano che si scorre: con migliaia di righe la tabella intera bloccava la pagina
+  const rigaTt = (c, i) => `${i && c.codice_pf !== pagina[i - 1].codice_pf ? `<tr class="tt-sep"><td colspan="${TC_COL.length + 4}"></td></tr>` : ''}<tr class="clic ${c.padre ? 'tt-rinf' : c.princ ? 'tt-princ' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
         <td class="c-art"><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
         <td class="c-comp">${c.padre ? '<span class="freccia-rinf">↳</span>' : ''}${nome(c)}</td><td class="sub c-comp">${c.padre ? esc(String(c.padre).replace(c.codice_pf + '-', '')) : ''}</td>
         ${TC_COL.map(([k, , tipo]) => `<td class="${CALCOLATI.has(k) ? 'c-ro ' : ''}${tipo ? 'c-cifra ' : ''}${k === 'descr_materiale' ? 'c-descr ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${k === 'descr_materiale' && c[k] ? `title="${esc(c[k])}"` : ''}${DERIVATI[k] && c.manca.includes(k) ? ` title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
-        <td>${c.manca.length ? `<span class="badge-manca" title="${c.manca.length} campi da completare">${c.manca.length} da compl.</span>` : '<span class="ok-txt">✓</span>'}</td></tr>`).join('')
+        <td>${c.manca.length ? `<span class="badge-manca" title="${c.manca.length} campi da completare">${c.manca.length} da compl.</span>` : '<span class="ok-txt">✓</span>'}</td></tr>`;
+  const righeTt = (da, a) => pagina.slice(da, a).map((c, j) => rigaTt(c, da + j)).join('');
+  t.lista = pagina; t.mostrate = Math.min(pagina.length, Math.max(PASSO_TT, t.minMostra || 0)); t.minMostra = 0;
+  box.innerHTML = `
+    <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([k, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}${CALCOLATI.has(k) ? ' c-ro' : ''}"${CALCOLATI.has(k) ? ' title="Si aggiorna da solo: non si compila a mano"' : ''}>${l}</th>`).join('')}<th>Stato</th></tr></thead>
+      <tbody>${righeTt(0, t.mostrate)
         || `<tr><td colspan="${TC_COL.length + 4}" class="vuoto">Nessun componente</td></tr>`}</tbody></table></div>
     `;
+  const w = $('#ce-elenco .tabwrap'), tb = $('#ce-elenco tbody');
+  t.altreTt = n => { if (t.mostrate >= pagina.length) return; const fino = Math.min(pagina.length, Math.max(t.mostrate + PASSO_TT, n || 0)); tb.insertAdjacentHTML('beforeend', righeTt(t.mostrate, fino)); t.mostrate = fino; };
+  if (w) w.addEventListener('scroll', () => { if (w.scrollTop + w.clientHeight > w.scrollHeight - 900) t.altreTt(); }, { passive: true });
   $('#ce-elenco tbody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) apriDaTutti(tr.dataset.pf, Number(tr.dataset.id)); });
 }
 // dalla tabella completa all'editor dell'articolo, col cursore sul primo campo da compilare del componente
