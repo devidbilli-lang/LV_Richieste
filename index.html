@@ -525,7 +525,7 @@ function toast(msg, tipo = '') {
   $('#toast').appendChild(el);
   setTimeout(() => el.remove(), tipo === 'err' ? 7000 : 3200);
 }
-async function api(path, { method = 'GET', body, query } = {}) {
+async function api(path, { method = 'GET', body, query, tentativo = 0 } = {}) {
   let url = API() + path;
   if (query) {
     const p = new URLSearchParams();
@@ -539,7 +539,13 @@ async function api(path, { method = 'GET', body, query } = {}) {
   let data;
   try { data = await res.json(); } catch (e) { data = { errore: 'Risposta non valida dal server (' + res.status + ')' }; }
   if (res.status === 401 && S.token && path !== '/api/login') { esci(true); throw new Error(data.errore || 'Sessione scaduta'); }
-  if (!res.ok) { const e = new Error(data.errore || 'Errore ' + res.status); e.status = res.status; throw e; }
+  if (!res.ok) {
+    let msg = data.errore || 'Errore ' + res.status;
+    const pieno = /overloaded|too many resources/i.test(msg); // D1 momentaneamente sovraccarico
+    if (pieno && method === 'GET' && tentativo < 2) { await new Promise(r => setTimeout(r, 2500 * (tentativo + 1))); return api(path, { method, body, query, tentativo: tentativo + 1 }); }
+    if (pieno) msg = 'Database momentaneamente sovraccarico: riprova tra qualche secondo';
+    const e = new Error(msg); e.status = res.status; throw e;
+  }
   return data;
 }
 function modale(titolo, corpo, piede = '', largo = false) {
@@ -3033,7 +3039,7 @@ async function eseguiImport() {
         let tent = 0;
         while (true) {
           try { await api('/api/admin/import/' + k, { method: 'POST', body: { righe: blocco, svuota: i === 0 } }); break; }
-          catch (e) { if (++tent >= 3) throw e; scrivi(`  nuovo tentativo (${e.message})`); await new Promise(r => setTimeout(r, 1500)); }
+          catch (e) { if (++tent >= 3) throw e; scrivi(`  nuovo tentativo (${e.message})`); await new Promise(r => setTimeout(r, 3000 * tent)); }
         }
         fatti += blocco.length;
         $('#im-bar').style.width = Math.round(fatti / tot * 100) + '%';
@@ -3046,9 +3052,12 @@ async function eseguiImport() {
     $('#im-bar').style.width = '100%';
     scrivi('Importazione completata.');
     toast('Importazione completata', 'ok');
-    await caricaAnagrafiche(); conteggiDb();
-  } catch (e) { scrivi('ERRORE: ' + e.message); toast(e.message, 'err'); }
+  } catch (e) { scrivi('ERRORE: ' + e.message); toast(e.message, 'err'); go.disabled = false; return; }
   finally { go.disabled = false; }
+  // elenchi aggiornati: dopo un'importazione grande il database può essere ancora sotto sforzo, quindi si aspetta un attimo
+  await new Promise(r => setTimeout(r, 2000));
+  try { await caricaAnagrafiche(); } catch (e) { scrivi(`(Dati importati. Gli elenchi non si sono ancora aggiornati: ricarica la pagina tra qualche secondo.)`); }
+  conteggiDb();
 }
 
 avvia();
