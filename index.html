@@ -1168,7 +1168,7 @@ function apriRiga(i, lista) { formRiga((lista || S.cache.righe)[i]); }
 function opzioniComponenti(pf, sel) {
   const comps = S.compPerPf.get(pf) || [];
   let html = `<option value="">${pf ? (comps.length ? 'Scegli il componente…' : 'Nessun componente per questo articolo') : 'Scegli prima il codice articolo'}</option>`;
-  html += comps.map(c => `<option value="${esc(c.chiave)}" ${c.chiave === sel ? 'selected' : ''}>${c.padre ? '\u00a0\u00a0\u00a0\u00a0↳ ' : ''}${esc(c.nome)}${c.nRinf ? ` (+${c.nRinf} rinforz${c.nRinf > 1 ? 'i' : 'o'})` : ''}${c.tipo ? ' · ' + esc(c.tipo) : ''}</option>`).join('');
+  html += comps.map(c => `<option value="${esc(c.chiave)}" ${c.chiave === sel ? 'selected' : ''}>${c.padre ? '\u00a0\u00a0\u00a0\u00a0↳ ' : ''}${esc(c.nome)}${c.nRinf ? ` (+${c.nRinf} rinforz${c.nRinf > 1 ? 'i' : 'o'})` : ''}</option>`).join('');
   if (sel && !comps.some(c => c.chiave === sel)) html += `<option value="${esc(sel)}" selected>${esc(sel)} (non in anagrafica)</option>`;
   return html;
 }
