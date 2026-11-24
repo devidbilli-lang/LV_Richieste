@@ -1041,7 +1041,7 @@ function cellaNuovaBase(n, k) {
     case 'numero': return '<span class="badge-nuova">NUOVA</span>';
     case 'stato_elab': return isMag() ? `<select data-f="stato_elab">${['Si', 'Non Richiedere'].map(x => `<option ${n.stato_elab === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`
       : `<span title="Gestito dal magazzino">${esc(n.stato_elab || 'Si')}</span>`;
-    case 'data': return `<input type="date" data-f="data" value="${esc(n.data)}" max="${giorniFa(-7)}" style="width:142px">`;
+    case 'data': return `<input type="date" data-f="data" value="${esc(n.data)}" max="${giorniFa(-7)}" style="width:118px;padding:6px 3px">`;
     case 'bollettino': return `<input data-f="bollettino" value="${esc(n.bollettino)}" style="width:96px">`;
     case 'conceria': return `<select data-f="conceria" style="width:112px">${opzioni(S.ana.concerie, n.conceria)}</select>`;
     case 'team_leader': return `<input data-f="team_leader" list="dl-operatori" value="${esc(n.team_leader)}" style="width:165px">`;
