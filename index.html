@@ -2255,15 +2255,32 @@ function mancantiCe(c) {
   if (!vuoto(c.codice_materiale) && vuoto(c.tdp) && !acc && !inf) m.push('tdp'); // infustiture e accessori: il TDP non si segnala
   return m;
 }
-async function caricaTuttiCe() {
+async function caricaTuttiCe(daCache) {
   S.ct = S.ct || { q: '', vedi: 'tutti', pag: 0 };
+  if (daCache && S.ct.righe) { disegnaTuttiCe(); ripristinaTuttiCe(); return; } // ritorno con «Annulla modifiche»: niente da ricaricare
   if ($('#ce-elenco')) $('#ce-elenco').innerHTML = '<p class="sub" style="margin:6px 4px">Carico i componenti…</p>';
   try {
     const righe = (await api('/api/admin/componenti/tutti')).righe, padri = new Set(righe.map(c => c.padre).filter(Boolean));
     S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c), princ: !c.padre && padri.has(c.chiave) })); // princ: componente principale con rinforzi (riga viola)
-    disegnaTuttiCe();
+    disegnaTuttiCe(); ripristinaTuttiCe();
   }
   catch (e) { toast(e.message, 'err'); }
+}
+// si riparte dal punto della tabella da cui si era aperto l'articolo, con la riga evidenziata
+function ripristinaTuttiCe() {
+  const r = S.ctRitorno; S.ctRitorno = null; if (!r) return;
+  const w = $('#ce-elenco .tabwrap'); if (!w) return;
+  w.scrollTop = r.top; w.scrollLeft = r.left; window.scrollTo(0, r.y);
+  let tr = $(`#ce-elenco tr[data-id="${r.id}"]`);
+  if (!tr && r.comp) { const x = (S.ct.righe || []).find(c => c.codice_pf === r.pf && c.componente === r.comp); if (x) tr = $(`#ce-elenco tr[data-id="${x.id}"]`); } // dopo il salvataggio gli id cambiano
+  if (tr) tr.classList.add('evidenzia');
+}
+// «Annulla modifiche» su un articolo aperto da «Tutti i componenti»: torna alla tabella dov'eri e scarta le modifiche non salvate
+function tornaATuttiCe() {
+  const r = S.ctRitorno, pf = S.ce.pf;
+  S.ce.modificato = false;
+  modoCe('tutti', !r.salvato); // se nel frattempo hai salvato, la tabella si ricarica
+  apriArticoloDb(pf); // l'editor (nascosto) torna alla versione salvata
 }
 function disegnaTuttiCe() {
   const t = S.ct, box = $('#ce-elenco'); if (!box || !t.righe) return;
@@ -2300,7 +2317,8 @@ function disegnaTuttiCe() {
 }
 // dalla tabella completa all'editor dell'articolo, col cursore sul primo campo da compilare del componente
 async function apriDaTutti(pf, id) {
-  const c = (S.ct.righe || []).find(x => x.id === id);
+  const c = (S.ct.righe || []).find(x => x.id === id), w = $('#ce-elenco .tabwrap');
+  S.ctRitorno = { pf, id, comp: c ? c.componente : null, top: w ? w.scrollTop : 0, left: w ? w.scrollLeft : 0, y: window.scrollY, salvato: false };
   modoCe('articolo');
   await apriArticoloDb(pf);
   if (!S.ce || S.ce.pf !== pf || !c) return;
@@ -2311,7 +2329,7 @@ async function apriDaTutti(pf, id) {
   const el = $(`[data-f="${campo}"]`, tr) || $('[data-f="componente"]', tr);
   el.scrollIntoView({ block: 'center', inline: 'center' }); el.focus({ preventScroll: true });
 }
-function modoCe(m) {
+function modoCe(m, daCache) {
   S.ceModo = m;
   $$('#ce-modo button').forEach(b => b.classList.toggle('att', b.dataset.m === m));
   $('#ce-art').classList.toggle('nascosto', m !== 'articolo');
@@ -2319,7 +2337,7 @@ function modoCe(m) {
   $('#ce-out').classList.toggle('nascosto', m !== 'articolo');
   $('#ce-elenco').classList.toggle('nascosto', m !== 'tutti'); // (id diverso dalla casella «seleziona tutte» dell'editor, #ce-tutti)
   if ($('#db-fab')) $('#db-fab').classList.toggle('nascosto', m !== 'articolo');
-  if (m === 'tutti') caricaTuttiCe();
+  if (m === 'tutti') caricaTuttiCe(daCache);
 }
 /* --- Database › Componenti: editor per articolo, inserimento veloce, rinforzi collegati --- */
 const CE_CAMPI = ['componente', 'n_materiale', 'n_pz', 'cns_area', 'sec_taglio', 'sec_prep', 'sec_ting', 'sec_rma'];
@@ -2411,7 +2429,8 @@ function disegnaCe() {
       <td style="white-space:nowrap">${r.padreUid ? '' : `<button class="btn picc" onclick="aggiungiRinforzo(${r.uid})" title="Aggiungi un rinforzo sotto questo componente">+ rinf.</button>`}
         <button class="icona" title="Elimina" onclick="togliCe(${r.uid})">✕</button></td></tr>`).join('')}</tbody></table></div>
     <div class="barra-salva" id="ce-barra"><span id="ce-stato" class="sub"></span><div class="spazio" style="flex:1"></div>
-      <button class="btn" onclick="apriArticoloDb('${esc(c.pf)}')">Annulla modifiche</button><button class="btn prim" id="ce-salva" onclick="salvaCe()">Salva articolo</button></div>`;
+      ${S.ctRitorno && S.ctRitorno.pf === c.pf ? '<button class="btn" onclick="tornaATuttiCe()" title="Scarta le modifiche non salvate e torna a Tutti i componenti, dov\'eri">Annulla modifiche</button>'
+        : `<button class="btn" onclick="apriArticoloDb('${esc(c.pf)}')">Annulla modifiche</button>`}<button class="btn prim" id="ce-salva" onclick="salvaCe()">Salva articolo</button></div>`;
   const tb = $('.tab-ce tbody');
   const segna = () => { c.modificato = true; aggiornaStatoCe(); };
   $('#ce-descr').addEventListener('input', e => { c.descr = e.target.value; segna(); });
@@ -2568,6 +2587,7 @@ async function salvaCe() { // (la tabella "Tutti i componenti" si ricarica quand
   $('#ce-salva').disabled = true;
   try {
     const r = await api('/api/admin/componenti/salva', { method: 'POST', body });
+    if (S.ctRitorno && S.ctRitorno.pf === c.pf) S.ctRitorno.salvato = true;
     caricaCe(r); toast(`${c.pf} salvato: ${fmtN(r.componenti.length)} righe`, 'ok');
     caricaAnagrafiche();
   } catch (e) { toast(e.message, 'err'); $('#ce-salva').disabled = false; }
