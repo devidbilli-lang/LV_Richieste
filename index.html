@@ -2395,6 +2395,7 @@ function cambiaTabDb(k) {
    Totale = SE(N° ≥ 1; TC ÷ N°; TC). Le voci della scheda si abbinano ai componenti dell'articolo e la somma dei Totali
    di ogni componente va nei suoi secondi della fase. --- */
 const ST_FASI = { prep: { foglio: 'preparazione', campo: 'sec_prep', nome: 'Preparazione', col: 'Sec. prep.' }, taglio: { foglio: 'taglio', campo: 'sec_taglio', nome: 'Taglio', col: 'Sec. taglio' } };
+const ST_BC = [{ rep: 'taglio', campo: 'sec_taglio', nome: 'Taglio' }, { rep: 'preparazione', campo: 'sec_prep', nome: 'Preparazione' }, { rep: 'rma', campo: 'sec_rma', nome: 'RMA' }, { rep: 'prima tingitura', campo: 'sec_ting', nome: 'Prima tingitura' }];
 const stNorm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 const stNum = v => { if (v === null || v === undefined || v === '') return null; if (typeof v === 'number') return v; const m = String(v).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
 const stTotale = r => r.tc === null ? null : (r.n !== null && r.n >= 1 ? r.tc / r.n : r.tc); // =SE($B="";"";SE($B>=1;$D/$B;$D))
@@ -2436,6 +2437,11 @@ async function stLeggi(file) {
     const rie = T.wb.Sheets[T.wb.SheetNames.find(n => /riepilogo/i.test(n)) || ''];
     const cella = (ws, ref) => ws && ws[ref] ? ws[ref].v : '';
     T.testa = rie ? { codice: cella(rie, 'D6'), nome: cella(rie, 'D7'), brand: cella(rie, 'D5'), valida: cella(rie, 'D10') } : {};
+    T.bc = {}; // Borse Complete: minuti di ogni fase dal Riepilogo (colonna F, accanto al reparto) → secondi
+    if (rie) for (let i = 1; i <= 40; i++) { // per indirizzo di cella: colonna E (reparto) e F (minuti)
+      const rep = stNorm(cella(rie, 'E' + i)), f = ST_BC.find(x => x.rep === rep), min = stNum(cella(rie, 'F' + i));
+      if (f && min !== null && T.bc[f.campo] === undefined) T.bc[f.campo] = { min, sec: min * 60 };
+    }
     const cod = (/^ST\d*_([A-Z0-9]+)/i.exec(String(T.testa.codice || file.name)) || [])[1];
     T.nonTrovato = '';
     if (cod && !T.pfScelto) { // articolo già scelto a mano: resta quello
@@ -2468,7 +2474,7 @@ async function stCaricaComp() {
   try {
     const [d, m] = await Promise.all([api('/api/admin/componenti', { query: T.st !== undefined && $('#st-stag') ? { pf: T.pf, stagione: T.st || '' } : { pf: T.pf } }), T.mappa ? Promise.resolve({ mappa: T.mappa }) : api('/api/admin/schede-tempi/mappa')]);
     T.mappa = m.mappa || {};
-    T.comp = (d.componenti || []).map(c => ({ id: c.id, nome: String(c.componente || '').replace(T.pf + '-', '').replace(new RegExp('^' + T.pf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*-\\s*'), ''), sec: c[ST_FASI[T.fase].campo] }));
+    T.comp = (d.componenti || []).map(c => ({ id: c.id, nome: String(c.componente || '').replace(T.pf + '-', '').replace(new RegExp('^' + T.pf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*-\\s*'), ''), sec: c[ST_FASI[T.fase].campo], tutti: { sec_taglio: c.sec_taglio, sec_prep: c.sec_prep, sec_rma: c.sec_rma, sec_ting: c.sec_ting } }));
     T.abb = {}; stSuggerisci();
   } catch (e) { toast(e.message, 'err'); T.comp = []; }
   stDisegna();
@@ -2509,10 +2515,31 @@ function stDisegna() {
     <div class="tabwrap"><table class="foglio"><thead><tr><th>Componente</th><th>Attuale [s]</th><th>Nuovo [s]</th><th>Differenza</th></tr></thead>
       <tbody>${T.comp.map(c => { const nv = nuovi.get(c.id), att = stNum(c.sec); return `<tr${nv !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : fmt(att, 2)}</td>
         <td>${nv !== undefined ? `<b>${fmt(nv, 2)}</b>` : 'resta com\'è'}</td><td>${nv !== undefined && att !== null ? `<span style="color:${nv - att > 0.004 ? '#d00000' : nv - att < -0.004 ? '#1e9e4a' : '#999'}">${nv - att > 0 ? '+' : ''}${fmt(nv - att, 2)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    ${stHtmlBc()}
     <details style="margin-top:14px"><summary class="sub" style="cursor:pointer">Righe lette dal foglio (A, I, J, K) e Totale calcolato</summary>
       <div class="tabwrap" style="margin-top:8px;max-height:420px"><table class="foglio"><thead><tr><th>Riga</th><th>Componente</th><th>N°Componenti</th><th>Coeff. [s]</th><th>TC [s]</th><th>Totale</th></tr></thead>
         <tbody>${T.righe.map(r => `<tr><td class="sub">${r.riga}</td><td style="text-align:left">${esc(r.comp)}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td>${esc(r.coeff ?? '')}</td><td>${r.tc === null ? '' : fmtN(r.tc)}</td><td><b>${r.tot === null ? '' : fmt(r.tot, 2)}</b></td></tr>`).join('')}</tbody></table></div></details></div>`;
   $$('#st-corpo select[data-st]').forEach(s => s.addEventListener('change', e => { T.abb[e.target.dataset.st] = e.target.value; stDisegna(); }));
+}
+const stBcComp = () => (S.st.comp || []).find(c => stNorm(c.nome) === 'borse complete');
+function stHtmlBc() { // Borse Complete: i tempi di tutta la borsa dal Riepilogo, minuti × 60 = secondi
+  const T = S.st, bc = T.bc || {};
+  if (!Object.keys(bc).length) return '';
+  const c = stBcComp();
+  return `<h3 style="margin:16px 0 8px">Borse Complete · dal foglio Riepilogo (TC rilevato [min] × 60)</h3>
+    <div class="tabwrap"><table class="foglio"><thead><tr><th>Fase</th><th>TC rilevato [min]</th><th>Nuovo [s]</th><th>Attuale [s]</th><th>Differenza</th></tr></thead>
+      <tbody>${ST_BC.map(f => { const v = bc[f.campo], att = c ? stNum(c.tutti[f.campo]) : null; return `<tr><td style="text-align:left">${f.nome}</td><td>${v ? fmt(v.min, 4) : '—'}</td><td><b>${v ? fmt(v.sec, 2) : '—'}</b></td>
+        <td>${!c ? '' : att === null ? '—' : fmt(att, 2)}</td><td>${v && c && att !== null ? `<span style="color:${v.sec - att > 0.004 ? '#d00000' : v.sec - att < -0.004 ? '#1e9e4a' : '#999'}">${v.sec - att > 0 ? '+' : ''}${fmt(v.sec - att, 2)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
+    <div class="riga-flex" style="margin-top:8px;justify-content:flex-end">${c ? `<button class="btn prim" onclick="stSalvaBc()">Salva in Borse Complete</button>` : `<span class="sub" style="color:var(--rosso)">${T.pf ? "L'articolo non ha il componente «Borse Complete»" : "Scegli l'articolo"}</span>`}</div>`;
+}
+async function stSalvaBc() {
+  const T = S.st, c = stBcComp(), bc = T.bc || {};
+  if (!c) return;
+  const valori = ST_BC.filter(f => bc[f.campo]).map(f => ({ id: c.id, campo: f.campo, sec: bc[f.campo].sec }));
+  if (!valori.length) return toast('Nel Riepilogo non ci sono tempi per fase', 'err');
+  if (!confirm(`Scrivo in «Borse Complete» di ${T.pf}${T.st ? ' (' + T.st + ')' : ''} i secondi di ${valori.length} fasi presi dal Riepilogo.`)) return;
+  try { await api('/api/admin/schede-tempi/applica', { method: 'POST', body: { valori } }); toast('Borse Complete aggiornata', 'ok'); stCaricaComp(); }
+  catch (e) { toast(e.message, 'err'); }
 }
 async function stSalva() {
   const T = S.st, F = ST_FASI[T.fase], nuovi = new Map();
