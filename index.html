@@ -2165,7 +2165,7 @@ function vistaAnagrafiche() {
   if (t === 'componenti') return vistaComponentiDb();
   $('#an-extra').innerHTML = `<span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button>
       <span class="sub" id="an-info"></span>
-      <button class="btn" onclick="caricaAna(0, { fine: true })" title="Vai all'ultima riga inserita">⇣ Ultima riga</button>
+      <button class="btn" onclick="caricaAna(Math.max(0, Math.floor(((S.filtri.anaTot || 1) - 1) / 200) * 200), { fine: true })" title="Vai all'ultima riga della tabella">⇣ Ultima riga</button>
       ${t === 'distinta' ? `<input id="an-pf" list="dl-art-db" placeholder="Articolo: Codice PF o descrizione…" value="${esc(S.filtri.dibaPf || '')}" style="width:260px" autocomplete="off">
         <datalist id="dl-art-db">${[...S.art.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([c, d]) => `<option value="${esc(c + ' — ' + (d || ''))}">`).join('')}</datalist>
         <button class="btn prim" onclick="apriImportDiba()">Importa da Excel</button>` : ''}
@@ -2454,7 +2454,7 @@ function disegnaTuttiCe() {
   if (barra && !$('#ct-q')) { // la barra si disegna una volta: la ricerca non perde il cursore
     barra.innerHTML = `<span class="sub" id="ct-art"></span><div class="pillole" id="ct-vedi"></div>
       <input id="ct-q" placeholder="Cerca articolo, componente, materiale…" value="${esc(t.q)}" style="width:230px" autocomplete="off">
-      <button class="btn" onclick="S.ct.ultimaTt && S.ct.ultimaTt()" title="Vai all'ultimo componente inserito">⇣ Ultima riga</button>
+      <button class="btn" onclick="S.ct.ultimaTt && S.ct.ultimaTt()" title="Vai all'ultima riga della tabella">⇣ Ultima riga</button>
       <span class="info-db" title="Rosso: da compilare nel componente. Giallo: manca in Distinta base, Items BC o TDP. 0 vale come compilato; gli accessori non hanno lavorazioni, quindi non hanno celle rosse; le infustiture sono rosse solo se manca il tempo di taglio; il TDP non si segnala per infustiture e accessori; sec. Ting. e sec. RMA vuoti non contano come mancanti. Viola: componente principale con rinforzi. Clic su una riga: si apre l'articolo sul campo da compilare.">i</span>`;
     const qi = $('#ct-q'); let tm;
     qi.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => { t.q = qi.value; t.pag = 0; disegnaTuttiCe(); }, 250); });
@@ -2480,9 +2480,9 @@ function disegnaTuttiCe() {
   const w = $('#ce-elenco .tabwrap'), tb = $('#ce-elenco tbody');
   t.altreTt = n => { if (t.mostrate >= pagina.length) return; const fino = Math.min(pagina.length, Math.max(t.mostrate + PASSO_TT, n || 0)); tb.insertAdjacentHTML('beforeend', righeTt(t.mostrate, fino)); t.mostrate = fino; };
   t.primaTt = () => { if (!t.inizio) return; const da = Math.max(0, t.inizio - PASSO_TT), h0 = w.scrollHeight; tb.insertAdjacentHTML('afterbegin', righeTt(da, t.inizio)); t.inizio = da; w.scrollTop += w.scrollHeight - h0; };
-  t.ultimaTt = () => { // salta all'ultimo componente inserito (id più alto): si disegnano solo le righe lì intorno
+  t.ultimaTt = () => { // salta all'ultima riga della tabella: si disegnano solo le righe lì intorno
     if (!pagina.length) return;
-    const k = pagina.reduce((m, c, i) => c.id > pagina[m].id ? i : m, 0);
+    const k = pagina.length - 1;
     if (k < t.inizio || k >= t.mostrate) { t.inizio = Math.max(0, k - 150); t.mostrate = Math.min(pagina.length, k + 60); tb.innerHTML = righeTt(t.inizio, t.mostrate); }
     const tr = $(`#ce-elenco tr[data-id="${pagina[k].id}"]`); if (!tr) return;
     w.scrollTop += tr.getBoundingClientRect().top - w.getBoundingClientRect().top - w.clientHeight / 2; tr.classList.remove('evidenzia'); void tr.offsetWidth; tr.classList.add('evidenzia');
@@ -2774,9 +2774,10 @@ async function caricaAna(offset = 0, opz = {}) {
   S.filtri.anaQ = $('#an-q').value.trim();
   const w0 = $('#an-tab .tabwrap'), pos = opz.mantieni && w0 ? { t: w0.scrollTop, l: w0.scrollLeft, y: window.scrollY } : null; // dopo un salvataggio si resta dove si stava lavorando
   try {
-    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '', vai: opz.fine ? 'ultima' : '' } });
+    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '' } });
     if (!$('#an-tab')) return;
-    if (opz.fine) { offset = r.offset || 0; opz.evidenzia = r.ultimo_id; }
+    if (opz.fine && offset + r.righe.length < r.totale) return caricaAna(Math.floor((r.totale - 1) / 200) * 200, opz); // nel frattempo sono arrivate altre righe
+    if (opz.fine && r.righe.length) opz.evidenzia = r.righe[r.righe.length - 1].id; // l'ultima riga di tutta la tabella
     S.cache.ana = r.righe;
     const cfg = TAB[t];
     $('#an-info').textContent = `${fmtN(r.totale)} record${r.totale > 200 ? ` · ${offset + 1}-${offset + r.righe.length}` : ''}`;
