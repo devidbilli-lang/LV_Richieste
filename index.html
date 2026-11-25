@@ -863,7 +863,7 @@ function opzioni(lista, sel, vuota = '—') { return `<option value="">${vuota}<
 function codiceDaArt(v) { return String(v || '').split('—')[0].trim().toUpperCase(); }
 const COL_FOGLIO = [['numero', 'Codice Richiesta'], ['stato_elab', 'Stato Elaborazione'], ['data', 'Data'], ['bollettino', 'Bollettino'], ['conceria', 'Conceria'], ['team_leader', 'Team Leader'],
   ['sku', 'SKU'], ['componente', 'Componente'], ['descrizione', 'Descrizione'], ['pz_ko', 'Pz KO'], ['motivazione', 'Motivazione'], ['responsabilita', 'Responsabilità'], ['operatore', 'Operatore'],
-  ['materiale', 'Materiale Richiesto'], ['note', 'Note'], ['minuti', 'Minuti', 'n'], ['totale_eur', 'Totale €', 'n'], ['stato', 'Stato Richiesta']];
+  ['materiale', 'Materiale Richiesto'], ['note', 'Note'], ['minuti', 'Minuti', 'n'], ['totale_eur', 'Totale', 'n'], ['stato', 'Stato Richiesta']];
 // stesse formattazioni condizionali del foglio Google
 function classeCella(k, r) {
   const nr = r.stato_elab === 'Non Richiedere', nota = !!String(r.note || '').trim(), acc = r.tm === 'Accessorio';
@@ -1022,7 +1022,7 @@ function cellaFoglio(r, k) {
     case 'data': return dIt(r.data);
     case 'pz_ko': return fmtN(r.pz_ko);
     case 'minuti': return r._nuova ? '<span class="sub">…</span>' : fmt(minTot(r), 2);
-    case 'totale_eur': return r._nuova ? '<span class="sub">…</span>' : fmt(r.totale_eur, 2);
+    case 'totale_eur': return r._nuova ? '<span class="sub">…</span>' : r.totale_eur === null || r.totale_eur === undefined || r.totale_eur === '' ? '' : fmt(r.totale_eur, 2) + ' €'; // € accanto al valore
     default: return esc(r[k] ?? '');
   }
 }
