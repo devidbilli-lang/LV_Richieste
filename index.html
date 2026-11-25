@@ -913,6 +913,7 @@ function vistaFoglio() {
         .map(([k, t]) => `<option value="${k}" ${f.stato === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <span class="sub" id="r-info"></span>
       <div class="spazio" style="flex:1"></div>
+      ${isAdmin() ? `<button class="icona" onclick="ricalcolaCnsRighe()" title="Rifà la parte materiale del Totale € (CNS area, TDP ed €) con i dati attuali del Database. I minuti restano quelli registrati.">↻ Ricalcola CNS</button>` : ''}
       <button class="icona" onclick="esportaRighe()" title="Esporta CSV">⤓ CSV</button>
     </div>
     ${testataFoglio()}
@@ -969,6 +970,16 @@ function ordina(k) {
   if (f.ord === k) f.dir = f.dir === 'asc' ? 'desc' : 'asc';
   else { f.ord = k; f.dir = 'asc'; }
   cercaRighe();
+}
+async function ricalcolaCnsRighe() { // righe mostrate (con i filtri attivi): solo CNS × €, i minuti restano quelli registrati
+  const ids = (S.cache.righe || []).filter(r => r.id).map(r => r.id);
+  if (!ids.length) return toast('Nessuna riga da ricalcolare', 'err');
+  if (!confirm(`Ricalcolo la parte materiale (CNS area, TDP ed €) del Totale € di ${fmtN(ids.length)} righe mostrate, con i dati attuali del Database.\n\nI minuti restano quelli registrati.`)) return;
+  try {
+    const r = await api('/api/righe/ricalcola-cns', { method: 'POST', body: { ids } });
+    toast(`Ricalcolate ${fmtN(r.cambiate)} righe` + (r.invariate ? ` · ${fmtN(r.invariate)} già a posto` : '') + (r.saltate ? ` · ${fmtN(r.saltate)} saltate (componente non trovato o senza minuti)` : ''), 'ok');
+    cercaRighe();
+  } catch (e) { toast(e.message, 'err'); }
 }
 async function cercaRighe(altre) {
   altre = altre === true;
