@@ -2634,8 +2634,16 @@ function disegnaCe() {
   });
   tb.addEventListener('change', e => {
     if (e.target.dataset.f !== 'padre') return;
-    const r = rigaCe(e.target); r.padreUid = e.target.value ? Number(e.target.value) : null; r.mod = true;
-    c.righe = ordinaCe(c.righe); segna(); disegnaCe();
+    const r = rigaCe(e.target), nuovo = e.target.value ? Number(e.target.value) : null;
+    if (!r.padreUid && nuovo && !r.casa) { const pr = c.righe.filter(x => !x.padreUid), i = pr.indexOf(r); r.casa = { dopo: i > 0 ? pr[i - 1].uid : null }; } // era principale: ci si ricorda dove stava
+    r.padreUid = nuovo; r.mod = true;
+    c.righe = ordinaCe(c.righe);
+    if (!nuovo && r.casa) { // torna principale (rinforzo assegnato per sbaglio): rientra nella posizione di prima
+      const dopo = r.casa.dopo, resto = c.righe.filter(x => x !== r); delete r.casa;
+      let k = dopo === null ? 0 : resto.findIndex(x => x.uid === dopo);
+      if (k >= 0) { if (dopo !== null) { k++; while (k < resto.length && resto[k].padreUid === dopo) k++; } resto.splice(k, 0, r); c.righe = resto; }
+    }
+    segna(); disegnaCe();
   });
   tb.addEventListener('keydown', e => { // Invio = stessa colonna, riga sotto (in fondo ne crea una nuova)
     const f = e.target.dataset.f; if (e.key !== 'Enter' || !f) return;
