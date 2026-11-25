@@ -121,6 +121,11 @@ table.foglio td{padding:8px 12px;height:38px;border:1px dotted #c6c6c6;color:#00
 table.foglio:not(.tab-ce) th,table.foglio:not(.tab-ce) td{text-align:center}
 table.foglio:not(.tab-ce) th.ord{padding-left:30px;padding-right:30px}
 table.foglio:not(.tab-ce) th.ord .freccia{position:absolute;right:7px;top:50%;transform:translateY(-50%);margin:0}
+/* Inserimento Dati: colonne strette (intestazioni su due righe, meno spazio intorno) */
+#r-tab table.foglio:not(.tab-ce) th.ord{padding:5px 19px 5px 6px;white-space:normal;line-height:1.15;width:1%;min-width:0}
+#r-tab table.foglio:not(.tab-ce) th.ord .freccia{right:3px;font-size:9px}
+#r-tab table.foglio td{padding:5px 6px}
+#r-tab tr.riga-nuova input,#r-tab tr.riga-nuova select{padding:6px 5px}
 table.foglio:not(.tab-ce) td input,table.foglio:not(.tab-ce) td select{text-align:center;text-align-last:center}
 table.foglio th.h-desc{color:#433dff}
 table.foglio th.h-pz{background:#fff;color:#ff0000;box-shadow:inset 0 0 0 2px #ff0000}
@@ -1056,18 +1061,18 @@ function cellaNuovaBase(n, k) {
     case 'stato_elab': return isMag() ? `<select data-f="stato_elab">${['Si', 'Non Richiedere'].map(x => `<option ${n.stato_elab === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`
       : `<span title="Gestito dal magazzino">${esc(n.stato_elab || 'Si')}</span>`;
     case 'data': return `<input type="date" data-f="data" value="${esc(n.data)}" max="${giorniFa(-7)}" style="width:118px;padding:6px 3px">`;
-    case 'bollettino': return `<input data-f="bollettino" value="${esc(n.bollettino)}" style="width:96px">`;
-    case 'conceria': return `<select data-f="conceria" style="width:112px">${opzioni(S.ana.concerie, n.conceria)}</select>`;
-    case 'team_leader': return `<input data-f="team_leader" list="dl-operatori" value="${esc(n.team_leader)}" style="width:165px">`;
+    case 'bollettino': return `<input data-f="bollettino" value="${esc(n.bollettino)}" style="width:74px">`;
+    case 'conceria': return `<select data-f="conceria" style="width:100px">${opzioni(S.ana.concerie, n.conceria)}</select>`;
+    case 'team_leader': return `<input data-f="team_leader" list="dl-operatori" value="${esc(n.team_leader)}" style="width:132px">`;
     case 'componente': return `<select data-f="componente" style="width:235px" ${comps.length ? '' : 'disabled'}>${opzioniComponenti(comps.length ? n.sku : '', n.componente)}</select>`;
     case 'sku': return `<input data-f="sku" list="dl-articoli" value="${esc(n.sku)}" placeholder="Articolo" autocomplete="off" style="width:112px">`;
     case 'descrizione': return esc(S.art.get(n.sku) || '');
-    case 'pz_ko': return `<input data-f="pz_ko" type="number" min="1" step="1" inputmode="numeric" value="${esc(n.pz_ko)}" style="width:72px;text-align:center">`;
-    case 'motivazione': return `<input data-f="motivazione" list="dl-motivazioni" value="${esc(n.motivazione)}" placeholder="Motivazione" style="width:245px">`;
+    case 'pz_ko': return `<input data-f="pz_ko" type="number" min="1" step="1" inputmode="numeric" value="${esc(n.pz_ko)}" style="width:56px;text-align:center">`;
+    case 'motivazione': return `<input data-f="motivazione" list="dl-motivazioni" value="${esc(n.motivazione)}" placeholder="Motivazione" style="width:200px">`;
     case 'responsabilita': { const m = S.mot.get(String(n.motivazione || '').trim()); return esc(m ? m.resp || '' : ''); }
-    case 'operatore': return `<input data-f="operatore" list="dl-operatori" value="${esc(n.operatore)}" style="width:165px">`;
-    case 'materiale': return `<select data-f="materiale" style="width:132px">${opzioni(S.ana.materiali, n.materiale)}</select>`;
-    case 'note': return `<input data-f="note" value="${esc(n.note)}" style="width:165px">`;
+    case 'operatore': return `<input data-f="operatore" list="dl-operatori" value="${esc(n.operatore)}" style="width:132px">`;
+    case 'materiale': return `<select data-f="materiale" style="width:118px">${opzioni(S.ana.materiali, n.materiale)}</select>`;
+    case 'note': return `<input data-f="note" value="${esc(n.note)}" style="width:130px">`;
     case 'minuti': case 'totale_eur': return '<span class="sub">…</span>';
     case 'stato': return badgeStato(pseudoRiga(n).stato_calc);
     case 'scheda': return esc(S.nuoveScheda);
