@@ -147,6 +147,7 @@ table.foglio td.c-desc{background:#d9d9d9;color:#433dff;font-style:italic;text-a
 table.foglio td.c-pz{color:#ff0000;text-align:center}
 table.foglio td.c-centro{text-align:center}
 table.foglio td.c-tl{font-style:italic;text-align:center}
+table.foglio td.c-auto-s{background:#e6e6e6} /* si compilano da sole (rosa/giallo delle righe Non Richiedere/accessori restano sopra) */
 table.foglio td.nr{background:#ffd4f8}
 table.foglio td.nota{background:#ffdaa3}
 table.foglio td.acc{background:#e7ff78}
@@ -176,7 +177,8 @@ tr.riga-nuova td.c-desc,tr.riga-nuova td.c-tl input{font-style:italic}
 tr.riga-nuova select:disabled{opacity:.55}
 tr.riga-nuova .errato{border:2px solid var(--rosso)!important;background:#fff0f0!important}
 tr.riga-nuova td{position:relative}
-tr.riga-nuova td.c-auto{background:#e6e6e6!important;color:#555;font-style:normal} /* righe nuove: celle che si compilano da sole (non a mano) */
+tr.riga-nuova td.c-auto{background:#e6e6e6!important;color:#555;font-style:normal}
+table.foglio td.c-tot,tr.riga-nuova td.c-auto.c-tot{color:#d00000;font-weight:600} /* Totale € in rosso */ /* righe nuove: celle che si compilano da sole (non a mano) */
 .replica{position:absolute;top:2px;right:2px;z-index:2;display:none;width:20px;height:20px;border-radius:50%;border:1.5px solid #fb8a3c;background:#fff;color:#e0701f;font-size:12px;font-weight:700;line-height:16px;padding:0;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .replica:hover{background:#fb8a3c;color:#fff}
 tr.riga-nuova td:hover .replica,tr.riga-nuova td:focus-within .replica{display:block}
@@ -881,6 +883,8 @@ function classeCella(k, r) {
     case 'note': c.push('c-note'); if (nota) c.push('nota'); break;
     case 'materiale': if (/^SOLO/i.test(r.materiale || '')) c.push('solo'); break;
   }
+  if (AUTO_NUOVA[k]) c.push('c-auto-s'); // colonne che si compilano da sole: grigie anche nelle righe salvate
+  if (k === 'totale_eur') c.push('c-tot');
   return c.join(' ');
 }
 const classeTh = k => k === 'descrizione' ? 'h-desc' : k === 'pz_ko' ? 'h-pz' : k === 'numero' || k === 'stato_elab' ? 'h-num' : '';
