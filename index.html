@@ -126,6 +126,8 @@ table.foglio:not(.tab-ce) th.ord .freccia{position:absolute;right:7px;top:50%;tr
 #r-tab table.foglio:not(.tab-ce) th.ord .freccia{right:3px;font-size:9px}
 #r-tab table.foglio td{padding:5px 6px}
 #r-tab tr.riga-nuova input,#r-tab tr.riga-nuova select{padding:6px 5px}
+/* caselle che si allargano con quello che c'è scritto (la colonna segue il testo più lungo) */
+#r-tab tr.riga-nuova input:not([type=date]):not([type=number]),#r-tab tr.riga-nuova select{field-sizing:content;max-width:520px}
 table.foglio:not(.tab-ce) td input,table.foglio:not(.tab-ce) td select{text-align:center;text-align-last:center}
 table.foglio th.h-desc{color:#433dff}
 table.foglio th.h-pz{background:#fff;color:#ff0000;box-shadow:inset 0 0 0 2px #ff0000}
@@ -151,7 +153,7 @@ table.foglio td.acc{background:#e7ff78}
 table.foglio td.sku-nota{color:#ff0000}
 table.foglio td.c-sku{color:#433dff}
 table.foglio td.solo{background:#baffe7;font-weight:700}
-table.foglio td.c-note{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.foglio td.c-note{white-space:nowrap}
 table.foglio tbody tr{cursor:default}
 th{z-index:3}
 th.ord{cursor:pointer;user-select:none}
@@ -1061,18 +1063,18 @@ function cellaNuovaBase(n, k) {
     case 'stato_elab': return isMag() ? `<select data-f="stato_elab">${['Si', 'Non Richiedere'].map(x => `<option ${n.stato_elab === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`
       : `<span title="Gestito dal magazzino">${esc(n.stato_elab || 'Si')}</span>`;
     case 'data': return `<input type="date" data-f="data" value="${esc(n.data)}" max="${giorniFa(-7)}" style="width:118px;padding:6px 3px">`;
-    case 'bollettino': return `<input data-f="bollettino" value="${esc(n.bollettino)}" style="width:74px">`;
-    case 'conceria': return `<select data-f="conceria" style="width:100px">${opzioni(S.ana.concerie, n.conceria)}</select>`;
-    case 'team_leader': return `<input data-f="team_leader" list="dl-operatori" value="${esc(n.team_leader)}" style="width:132px">`;
-    case 'componente': return `<select data-f="componente" style="width:235px" ${comps.length ? '' : 'disabled'}>${opzioniComponenti(comps.length ? n.sku : '', n.componente)}</select>`;
-    case 'sku': return `<input data-f="sku" list="dl-articoli" value="${esc(n.sku)}" placeholder="Articolo" autocomplete="off" style="width:112px">`;
+    case 'bollettino': return `<input data-f="bollettino" value="${esc(n.bollettino)}" style="min-width:60px">`;
+    case 'conceria': return `<select data-f="conceria" style="min-width:80px">${opzioni(S.ana.concerie, n.conceria)}</select>`;
+    case 'team_leader': return `<input data-f="team_leader" list="dl-operatori" value="${esc(n.team_leader)}" style="min-width:110px">`;
+    case 'componente': return `<select data-f="componente" style="min-width:180px" ${comps.length ? '' : 'disabled'}>${opzioniComponenti(comps.length ? n.sku : '', n.componente)}</select>`;
+    case 'sku': return `<input data-f="sku" list="dl-articoli" value="${esc(n.sku)}" placeholder="Articolo" autocomplete="off" style="min-width:160px">`;
     case 'descrizione': return esc(S.art.get(n.sku) || '');
     case 'pz_ko': return `<input data-f="pz_ko" type="number" min="1" step="1" inputmode="numeric" value="${esc(n.pz_ko)}" style="width:56px;text-align:center">`;
-    case 'motivazione': return `<input data-f="motivazione" list="dl-motivazioni" value="${esc(n.motivazione)}" placeholder="Motivazione" style="width:200px">`;
+    case 'motivazione': return `<input data-f="motivazione" list="dl-motivazioni" value="${esc(n.motivazione)}" placeholder="Motivazione" style="min-width:150px">`;
     case 'responsabilita': { const m = S.mot.get(String(n.motivazione || '').trim()); return esc(m ? m.resp || '' : ''); }
-    case 'operatore': return `<input data-f="operatore" list="dl-operatori" value="${esc(n.operatore)}" style="width:132px">`;
-    case 'materiale': return `<select data-f="materiale" style="width:118px">${opzioni(S.ana.materiali, n.materiale)}</select>`;
-    case 'note': return `<input data-f="note" value="${esc(n.note)}" style="width:130px">`;
+    case 'operatore': return `<input data-f="operatore" list="dl-operatori" value="${esc(n.operatore)}" style="min-width:110px">`;
+    case 'materiale': return `<select data-f="materiale" style="min-width:90px">${opzioni(S.ana.materiali, n.materiale)}</select>`;
+    case 'note': return `<input data-f="note" value="${esc(n.note)}" style="min-width:100px">`;
     case 'minuti': case 'totale_eur': return '<span class="sub">…</span>';
     case 'stato': return badgeStato(pseudoRiga(n).stato_calc);
     case 'scheda': return esc(S.nuoveScheda);
@@ -1118,13 +1120,19 @@ function aggiornaCelleNuova(tr, n) { // colori, descrizione, responsabilità, st
     if (['descrizione', 'responsabilita', 'stato'].includes(k)) td.innerHTML = cellaNuova(n, k);
   });
 }
+function adattaCasella(el) { // solo dove il browser non sa allargare da solo le caselle
+  if (!el || el.type === 'date' || el.type === 'number' || CSS.supports('field-sizing', 'content')) return;
+  const t = el.tagName === 'SELECT' ? (el.options[el.selectedIndex] || {}).text || '' : el.value || el.placeholder || '';
+  el.style.width = `calc(${Math.max(4, t.length + 3)}ch + 16px)`;
+}
 function eventiNuove() {
   const tb = $('#r-tab tbody'); if (!tb) return;
+  $$('tr.riga-nuova input, tr.riga-nuova select', tb).forEach(adattaCasella);
   const agg = e => {
     const el = e.target, f = el.dataset.f; if (!f) return;
     const tr = el.closest('tr.riga-nuova'); if (!tr) return;
     const n = S.nuove[Number(tr.dataset.n)];
-    el.classList.remove('errato');
+    el.classList.remove('errato'); adattaCasella(el);
     if (f === 'sku') {
       if (e.type === 'input' && !S.compPerPf.has(codiceDaArt(el.value))) { n.sku = codiceDaArt(el.value); salvaNuoveLocale(); return; }
       const cod = codiceDaArt(el.value); n.sku = cod; el.value = cod;
