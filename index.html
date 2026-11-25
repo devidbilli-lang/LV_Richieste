@@ -189,6 +189,7 @@ tr.riga-nuova td.c-auto{background:#e6e6e6!important;color:#555;font-style:norma
 table.foglio td.c-tot,tr.riga-nuova td.c-auto.c-tot{color:#d00000;font-weight:600} /* Totale € in rosso */ /* righe nuove: celle che si compilano da sole (non a mano) */
 .replica{position:absolute;top:2px;right:2px;z-index:2;display:none;width:20px;height:20px;border-radius:50%;border:1.5px solid #fb8a3c;background:#fff;color:#e0701f;font-size:12px;font-weight:700;line-height:16px;padding:0;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .replica:hover{background:#fb8a3c;color:#fff}
+tr.riga-nuova .replica,.tab-ce .replica{display:none!important} /* righe nuove e componenti: ora si copia con Ctrl+C/V e il quadratino blu */
 tr.riga-nuova td:hover .replica,tr.riga-nuova td:focus-within .replica{display:block}
 @media (hover:none){tr.riga-nuova td:focus-within .replica{display:block;width:26px;height:26px;line-height:22px}}
 .badge-nuova{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:2px 5px;font-size:10px;font-weight:700;letter-spacing:.02em}
