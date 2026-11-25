@@ -2427,8 +2427,12 @@ async function caricaTuttiCe(daCache) {
 function ripristinaTuttiCe() {
   const r = S.ctRitorno; S.ctRitorno = null; if (!r) return;
   const w = $('#ce-elenco .tabwrap'); if (!w) return;
-  if (S.ct.altreTt && S.ct.lista) { const k = S.ct.lista.findIndex(c => c.id === r.id || (c.codice_pf === r.pf && c.componente === r.comp)); S.ct.altreTt(Math.max(k + 80, Math.ceil((r.top + w.clientHeight) / 20))); }
-  w.scrollTop = r.top; w.scrollLeft = r.left; window.scrollTo(0, r.y);
+  const k = S.ct.lista ? S.ct.lista.findIndex(c => c.id === r.id || (c.codice_pf === r.pf && c.componente === r.comp)) : -1;
+  if (k >= 0 && S.ct.finestraTt) S.ct.finestraTt(Math.max(0, k - 150), Math.min(S.ct.lista.length, k + 100)); // solo le righe lì intorno: veloce anche in fondo alla tabella
+  w.scrollLeft = r.left; window.scrollTo(0, r.y);
+  const trK = k >= 0 ? $(`#ce-elenco tr[data-id="${S.ct.lista[k].id}"]`) : null;
+  if (trK && r.dy != null) w.scrollTop += trK.getBoundingClientRect().top - w.getBoundingClientRect().top - r.dy; // la riga torna alla stessa altezza di prima
+  else w.scrollTop = r.top;
   let tr = $(`#ce-elenco tr[data-id="${r.id}"]`);
   if (!tr && r.comp) { const x = (S.ct.righe || []).find(c => c.codice_pf === r.pf && c.componente === r.comp); if (x) tr = $(`#ce-elenco tr[data-id="${x.id}"]`); } // dopo il salvataggio gli id cambiano
   if (tr) tr.classList.add('evidenzia');
@@ -2479,6 +2483,7 @@ function disegnaTuttiCe() {
     `;
   const w = $('#ce-elenco .tabwrap'), tb = $('#ce-elenco tbody');
   t.altreTt = n => { if (t.mostrate >= pagina.length) return; const fino = Math.min(pagina.length, Math.max(t.mostrate + PASSO_TT, n || 0)); tb.insertAdjacentHTML('beforeend', righeTt(t.mostrate, fino)); t.mostrate = fino; };
+  t.finestraTt = (da, a) => { t.inizio = da; t.mostrate = a; tb.innerHTML = righeTt(da, a); };
   t.primaTt = () => { if (!t.inizio) return; const da = Math.max(0, t.inizio - PASSO_TT), h0 = w.scrollHeight; tb.insertAdjacentHTML('afterbegin', righeTt(da, t.inizio)); t.inizio = da; w.scrollTop += w.scrollHeight - h0; };
   t.ultimaTt = () => { // salta all'ultima riga della tabella: si disegnano solo le righe lì intorno
     if (!pagina.length) return;
@@ -2493,7 +2498,8 @@ function disegnaTuttiCe() {
 // dalla tabella completa all'editor dell'articolo, col cursore sul primo campo da compilare del componente
 async function apriDaTutti(pf, id) {
   const c = (S.ct.righe || []).find(x => x.id === id), w = $('#ce-elenco .tabwrap');
-  S.ctRitorno = { pf, id, comp: c ? c.componente : null, top: w ? w.scrollTop : 0, left: w ? w.scrollLeft : 0, y: window.scrollY, salvato: false };
+  S.ctRitorno = { pf, id, comp: c ? c.componente : null, top: w ? w.scrollTop : 0, left: w ? w.scrollLeft : 0, y: window.scrollY, salvato: false,
+    dy: (tr => tr && w ? tr.getBoundingClientRect().top - w.getBoundingClientRect().top : null)($(`#ce-elenco tr[data-id="${id}"]`)) };
   modoCe('articolo');
   await apriArticoloDb(pf);
   if (!S.ce || S.ce.pf !== pf || !c) return;
