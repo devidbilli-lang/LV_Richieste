@@ -61,6 +61,7 @@ input,select,textarea{border:1px solid var(--bordo);background:#fff;border-radiu
 input:focus,select:focus,textarea:focus{outline:2px solid rgba(251,138,60,.3);border-color:var(--ciano-scuro)}
 input[readonly]{background:var(--grigio-chiaro);color:var(--tenue)}
 input.errato{border-color:var(--rosso);background:var(--rosso-chiaro)}
+.obbl{color:#e00000;font-style:normal;font-weight:700;margin-left:2px} /* campo obbligatorio */
 .btn{border:1px solid var(--bordo);background:#fff;border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:600;white-space:nowrap}
 .btn:hover{border-color:var(--viola);color:var(--viola)}
 .btn.prim{background:var(--viola);border-color:var(--viola);color:#fff}
@@ -1086,6 +1087,7 @@ function cellaNuovaBase(n, k) {
   }
 }
 // righe nuove: colonne che l'app compila da sola (grigie, come le colonne calcolate del Database)
+const OBBLIGATORI = { sku: 1, componente: 1, pz_ko: 1, motivazione: 1 }; // * rosso nell'intestazione
 const AUTO_NUOVA = { scheda: 'È la scheda scelta in alto', numero: 'Lo assegna il magazzino', descrizione: 'Si compila da sola dallo SKU', responsabilita: 'Si compila da sola dalla motivazione',
   minuti: 'Si calcola al salvataggio', totale_eur: 'Si calcola al salvataggio', stato: 'Si calcola da solo' };
 function rigaNuovaHtml(n, j, cols) {
@@ -1266,7 +1268,7 @@ function disegnaRighe() {
   const corpo = righe.map((r, i) => rigaHtml(r, i, cols, S.form && S.form.cont === '#pannello' && S.form.id === r.id ? 'id="riga-edit" class="riga-3d"' : '')).join('');
   const vuota = !righe.length && !nuova;
   const freccia = k => f.ord === k ? `<span class="freccia">${f.dir === 'asc' ? '▲' : '▼'}</span>` : '<span class="freccia spenta">▲▼</span>';
-  $('#r-tab').innerHTML = `<div class="tabwrap tab-alta"><table class="foglio"><thead><tr>${cols.map(c => `<th class="ord ${c[2] === 'n' ? 'n ' : ''}${classeTh(c[0])}" onclick="ordina('${c[0]}')" title="${c[0] === 'stato_elab' ? 'Stato Elaborazione · ' : ''}Ordina">${c[0] === 'numero' ? 'Codice<br>Richiesta' : c[0] === 'stato_elab' ? 'Stato<br>Elab.' : c[1]}${freccia(c[0])}</th>`).join('')}<th></th></tr></thead>
+  $('#r-tab').innerHTML = `<div class="tabwrap tab-alta"><table class="foglio"><thead><tr>${cols.map(c => `<th class="ord ${c[2] === 'n' ? 'n ' : ''}${classeTh(c[0])}" onclick="ordina('${c[0]}')" title="${c[0] === 'stato_elab' ? 'Stato Elaborazione · ' : ''}${OBBLIGATORI[c[0]] ? 'Obbligatorio · ' : ''}Ordina">${c[0] === 'numero' ? 'Codice<br>Richiesta' : c[0] === 'stato_elab' ? 'Stato<br>Elab.' : c[1]}${OBBLIGATORI[c[0]] ? '<span class="obbl">*</span>' : ''}${freccia(c[0])}</th>`).join('')}<th></th></tr></thead>
     <tbody>${vuota ? `<tr><td colspan="${cols.length + 1}" class="vuoto">${puoAggiungere() ? 'Nessuna riga in questo periodo. Premi <b>+</b> per aggiungerne una.' : 'Nessuna riga. Scegli una scheda per aggiungere righe.'}</td></tr>`
       : (f.dir === 'asc' ? corpo + segnaposto + spazio : spazio + segnaposto + corpo)}</tbody></table></div>
     ${righe.length < t.n ? `<div style="text-align:center;margin:12px"><button class="btn" onclick="cercaRighe(true)">Carica altre ${fmtN(Math.min(500, t.n - righe.length))}</button></div>` : ''}
@@ -1362,10 +1364,10 @@ function formRiga(r, pre) {
       <label class="campo">Bollettino<input id="e-boll" value="${esc(d.bollettino || '')}" ${ro}></label>
       <label class="campo">Conceria<select id="e-conc" ${dis}>${opzioni(S.ana.concerie, d.conceria)}</select></label>
       <label class="campo">Team leader<input id="e-tl" list="dl-operatori" value="${esc(d.team_leader || '')}" placeholder="Cerca…" ${ro}></label>
-      <label class="campo largo">Codice articolo<input id="e-art" list="dl-articoli" value="${esc(pf ? pf + ' — ' + (S.art.get(pf) || '') : '')}" placeholder="Codice PF o descrizione…" autocomplete="off" ${ro}></label>
-      <label class="campo largo">Componente<select id="e-comp" ${dis || (pf ? '' : 'disabled')}>${opzioniComponenti(pf, d.componente)}</select></label>
-      <label class="campo">Pz KO<input type="number" min="0" step="1" id="e-pz" value="${esc(d.pz_ko ?? '')}" ${ro}></label>
-      <label class="campo largo">Motivazione<input id="e-mot" list="dl-motivazioni" value="${esc(d.motivazione || '')}" placeholder="Cerca motivazione…" ${ro}><span class="sub" id="e-motinfo" style="font-weight:500">${infoMot(d.motivazione)}</span></label>
+      <label class="campo largo">Codice articolo<span class="obbl">*</span><input id="e-art" list="dl-articoli" value="${esc(pf ? pf + ' — ' + (S.art.get(pf) || '') : '')}" placeholder="Codice PF o descrizione…" autocomplete="off" ${ro}></label>
+      <label class="campo largo">Componente<span class="obbl">*</span><select id="e-comp" ${dis || (pf ? '' : 'disabled')}>${opzioniComponenti(pf, d.componente)}</select></label>
+      <label class="campo">Pz KO<span class="obbl">*</span><input type="number" min="0" step="1" id="e-pz" value="${esc(d.pz_ko ?? '')}" ${ro}></label>
+      <label class="campo largo">Motivazione<span class="obbl">*</span><input id="e-mot" list="dl-motivazioni" value="${esc(d.motivazione || '')}" placeholder="Cerca motivazione…" ${ro}><span class="sub" id="e-motinfo" style="font-weight:500">${infoMot(d.motivazione)}</span></label>
       <label class="campo">Operatore<input id="e-op" list="dl-operatori" value="${esc(d.operatore || '')}" placeholder="Cerca…" ${ro}></label>
       <label class="campo">Materiale richiesto<select id="e-mat" ${dis}>${opzioni(S.ana.materiali, d.materiale)}</select></label>
       <label class="campo"${isMag() ? '' : ' title="Gestito dal magazzino"'}>Stato elaborazione<select id="e-stato" ${isMag() ? dis : 'disabled'}><option ${d.stato_elab !== 'Non Richiedere' ? 'selected' : ''}>Si</option><option ${d.stato_elab === 'Non Richiedere' ? 'selected' : ''}>Non Richiedere</option></select></label>
