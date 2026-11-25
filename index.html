@@ -2388,11 +2388,153 @@ function cambiaTabDb(k) {
   if (S.filtri.anaTab === 'componenti' && S.ce && S.ce.modificato && k !== 'componenti' && !confirm(`Le modifiche a ${S.ce.pf} non sono salvate. Uscire comunque?`)) return;
   S.filtri.anaTab = k; S.filtri.anaQ = ''; vistaAnagrafiche();
 }
+/* --- Database › Schede tempi: si carica la scheda tempi ufficiale (Excel), si prendono le colonne A, I, J, K del foglio
+   della fase (Componente, N°Componenti, Coeff. [s], TC [s]) e si calcola il Totale come nel foglio «Formula per schede tempi»:
+   Totale = SE(N° ≥ 1; TC ÷ N°; TC). Le voci della scheda si abbinano ai componenti dell'articolo e la somma dei Totali
+   di ogni componente va nei suoi secondi della fase. --- */
+const ST_FASI = { prep: { foglio: 'preparazione', campo: 'sec_prep', nome: 'Preparazione', col: 'Sec. prep.' }, taglio: { foglio: 'taglio', campo: 'sec_taglio', nome: 'Taglio', col: 'Sec. taglio' } };
+const stNorm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const stNum = v => { if (v === null || v === undefined || v === '') return null; if (typeof v === 'number') return v; const m = String(v).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
+const stTotale = r => r.tc === null ? null : (r.n !== null && r.n >= 1 ? r.tc / r.n : r.tc); // =SE($B="";"";SE($B>=1;$D/$B;$D))
+const stParole = s => stNorm(s).replace(/[^a-z0-9àèéìòù ]/g, ' ').split(' ').filter(w => w.length > 1 && !['x', 'di', 'del', 'della', 'su', 'per', 'con'].includes(w));
+function vistaSchedeTempi() {
+  const T = S.st || (S.st = { fase: 'prep' });
+  $('#an-extra').innerHTML = '';
+  $('#an-corpo').innerHTML = `<div class="card">
+    <div class="riga-flex" style="gap:14px;align-items:flex-end">
+      <label class="campo">Scheda tempi (Excel)<input type="file" id="st-file" accept=".xlsx,.xlsm,.xls" style="width:auto"></label>
+      <label class="campo">Fase<select id="st-fase" style="width:auto">${Object.entries(ST_FASI).map(([k, f]) => `<option value="${k}" ${T.fase === k ? 'selected' : ''}>${f.nome} → ${f.col}</option>`).join('')}</select></label>
+      <label class="campo largo">Articolo<input id="st-pf" list="dl-st-art" value="${esc(T.pf || '')}" placeholder="Codice PF…" autocomplete="off" style="width:280px"></label>
+      <datalist id="dl-st-art">${[...S.art.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([c, d]) => `<option value="${esc(c)}">${esc(d || '')}</option>`).join('')}</datalist>
+      ${typeof stagioniCon === 'function' ? `<label class="campo">Collezione<select id="st-stag" style="width:auto"></select></label>` : ''}
+    </div>
+    <div class="sub" id="st-info" style="margin-top:10px">Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${ST_FASI[T.fase].nome}».</div></div>
+    <div id="st-corpo"></div>`;
+  $('#st-file').addEventListener('change', e => stLeggi(e.target.files[0]));
+  $('#st-fase').addEventListener('change', e => { T.fase = e.target.value; if (T.wb) stDaFoglio(); else stDisegna(); });
+  const scegliArt = () => { T.pf = codiceDaArt($('#st-pf').value.trim()).toUpperCase(); T.pfScelto = !!T.pf; T.nonTrovato = ''; stOpzStag(); stCaricaComp(); };
+  $('#st-pf').addEventListener('change', scegliArt);
+  if ($('#st-stag')) $('#st-stag').addEventListener('change', e => { T.st = e.target.value; stCaricaComp(); });
+  stOpzStag(); if (T.righe) stDisegna();
+}
+function stOpzStag() {
+  const T = S.st, sel = $('#st-stag'); if (!sel) return;
+  const l = T.pf && typeof stagioniCon === 'function' ? stagioniCon(T.pf) : [];
+  if (!l.includes(T.st)) T.st = l.length ? (typeof stagDef === 'function' ? stagDef(T.pf) : l[l.length - 1]) : '';
+  sel.innerHTML = l.length ? l.map(s => `<option ${s === T.st ? 'selected' : ''}>${esc(s)}</option>`).join('') : '<option value="">—</option>';
+}
+async function stLeggi(file) {
+  if (!file) return;
+  const T = S.st;
+  try {
+    await caricaSheetJS();
+    T.wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    T.file = file.name;
+    // testata dal foglio Riepilogo (se c'è) e codice articolo dal nome della scheda (ST0_<codice>_…) o dal Codice PLM
+    const rie = T.wb.Sheets[T.wb.SheetNames.find(n => /riepilogo/i.test(n)) || ''];
+    const cella = (ws, ref) => ws && ws[ref] ? ws[ref].v : '';
+    T.testa = rie ? { codice: cella(rie, 'D6'), nome: cella(rie, 'D7'), brand: cella(rie, 'D5'), valida: cella(rie, 'D10') } : {};
+    const cod = (/^ST\d*_([A-Z0-9]+)/i.exec(String(T.testa.codice || file.name)) || [])[1];
+    T.nonTrovato = '';
+    if (cod && !T.pfScelto) { // articolo già scelto a mano: resta quello
+      const k = [...S.art.keys()].filter(c => c.toUpperCase() === cod.toUpperCase() || c.toUpperCase().startsWith(cod.toUpperCase()));
+      if (k.length) { T.pf = k[0]; $('#st-pf').value = k[0]; stOpzStag(); } else T.nonTrovato = cod;
+    }
+    stDaFoglio();
+  } catch (e) { toast('File non leggibile: ' + e.message, 'err'); }
+}
+function stDaFoglio() {
+  const T = S.st, F = ST_FASI[T.fase];
+  const nome = T.wb.SheetNames.find(n => stNorm(n) === F.foglio) || T.wb.SheetNames.find(n => { const ws = T.wb.Sheets[n]; return ws.A1 && new RegExp('scheda di ' + F.foglio, 'i').test(String(ws.A1.v)); });
+  if (!nome) { T.righe = []; toast(`Nel file non c'è il foglio «${F.nome}»`, 'err'); return stDisegna(); }
+  const aoa = XLSX.utils.sheet_to_json(T.wb.Sheets[nome], { header: 1, raw: true, defval: null, blankrows: true });
+  let h = aoa.findIndex((r, i) => i < 20 && stNorm(r[0]) === 'componente');
+  if (h < 0) h = 3; // nella scheda ufficiale le intestazioni sono alla riga 4
+  T.righe = [];
+  for (let i = h + 1; i < aoa.length; i++) {
+    const r = aoa[i] || [], comp = String(r[0] ?? '').trim(); // A
+    if (!comp) continue;
+    const riga = { riga: i + 1, comp, n: stNum(r[8]), coeff: r[9], tc: stNum(r[10]) }; // I, J, K
+    if (riga.tc === null && riga.n === null) continue;
+    riga.tot = stTotale(riga); T.righe.push(riga);
+  }
+  T.foglio = nome; stCaricaComp();
+}
+async function stCaricaComp() {
+  const T = S.st;
+  if (!T.pf) return stDisegna();
+  try {
+    const [d, m] = await Promise.all([api('/api/admin/componenti', { query: T.st !== undefined && $('#st-stag') ? { pf: T.pf, stagione: T.st || '' } : { pf: T.pf } }), T.mappa ? Promise.resolve({ mappa: T.mappa }) : api('/api/admin/schede-tempi/mappa')]);
+    T.mappa = m.mappa || {};
+    T.comp = (d.componenti || []).map(c => ({ id: c.id, nome: String(c.componente || '').replace(T.pf + '-', '').replace(new RegExp('^' + T.pf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*-\\s*'), ''), sec: c[ST_FASI[T.fase].campo] }));
+    T.abb = {}; stSuggerisci();
+  } catch (e) { toast(e.message, 'err'); T.comp = []; }
+  stDisegna();
+}
+function stSuggerisci() { // per ogni voce della scheda: abbinamento salvato, stesso nome, o il componente con più parole in comune
+  const T = S.st, gruppi = [...new Set((T.righe || []).map(r => r.comp))];
+  for (const g of gruppi) {
+    if (T.abb[g] !== undefined) continue;
+    const salvato = T.mappa[stNorm(g)], perNome = n => T.comp.find(c => stNorm(c.nome) === stNorm(n));
+    let c = (salvato && perNome(salvato)) || perNome(g);
+    if (!c) {
+      const pg = stParole(g); let best = null, sc = 0;
+      for (const x of T.comp) { const px = stParole(x.nome), com = pg.filter(w => px.some(y => y === w || (w.length > 3 && (y.startsWith(w) || w.startsWith(y))))).length, s = com / Math.max(pg.length, px.length, 1); if (s > sc) { sc = s; best = x; } }
+      if (sc >= 0.34) c = best;
+    }
+    T.abb[g] = c ? c.id : '';
+  }
+}
+function stDisegna() {
+  const T = S.st, box = $('#st-corpo'); if (!box) return;
+  const F = ST_FASI[T.fase]; T.abb = T.abb || {};
+  if ($('#st-info')) $('#st-info').innerHTML = T.wb ? `<b>${esc(T.file)}</b> · foglio «${esc(T.foglio || F.nome)}» · ${fmtN((T.righe || []).length)} righe${T.testa && T.testa.nome ? ` · ${esc(T.testa.nome)}` : ''}${T.testa && T.testa.brand ? ` · ${esc(T.testa.brand)}` : ''}${T.nonTrovato ? ` · <span style="color:var(--rosso)">articolo ${esc(T.nonTrovato)} non trovato nel Database: sceglilo a mano</span>` : ''}` : `Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${F.nome}».`;
+  if (!T.righe) { box.innerHTML = ''; return; }
+  const gruppi = []; const per = new Map();
+  for (const r of T.righe) { if (!per.has(r.comp)) { per.set(r.comp, { comp: r.comp, n: 0, tot: 0 }); gruppi.push(per.get(r.comp)); } const g = per.get(r.comp); g.n++; g.tot += r.tot || 0; }
+  const nuovi = new Map(); for (const g of gruppi) { const id = Number(T.abb[g.comp]); if (id) nuovi.set(id, (nuovi.get(id) || 0) + g.tot); }
+  const totale = T.righe.reduce((s, r) => s + (r.tot || 0), 0);
+  const opz = sel => `<option value="">— non usare —</option>${(T.comp || []).map(c => `<option value="${c.id}" ${Number(sel) === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}`;
+  box.innerHTML = `<div class="card"><div class="riga-flex"><h3 style="margin:0;flex:1">Abbinamento ai componenti ${T.pf ? `di ${esc(T.pf)}${T.st ? ' · ' + esc(T.st) : ''}` : ''}</h3>
+      <span class="sub">Totale scheda <b>${fmt(totale, 2)}</b> s</span>
+      <button class="btn" onclick="stEsporta()">⤓ Excel</button>
+      <button class="btn prim" onclick="stSalva()" ${T.comp && T.comp.length ? '' : 'disabled'}>Salva nei componenti</button></div>
+    ${!T.pf ? '<div class="sub" style="margin-top:8px">Scegli l\'articolo per abbinare le voci ai suoi componenti.</div>' : !(T.comp || []).length ? '<div class="sub" style="margin-top:8px">L\'articolo non ha componenti nel Database.</div>' : ''}
+    <div class="tabwrap" style="margin-top:10px"><table class="foglio"><thead><tr><th>Voce della scheda</th><th>Righe</th><th>Totale [s]</th><th>Componente dell'articolo</th></tr></thead>
+      <tbody>${gruppi.map(g => `<tr><td style="text-align:left">${esc(g.comp)}</td><td>${g.n}</td><td><b>${fmt(g.tot, 2)}</b></td>
+        <td><select data-st="${esc(g.comp)}" style="min-width:240px">${opz(T.abb[g.comp])}</select></td></tr>`).join('')}</tbody></table></div>
+    ${(T.comp || []).length ? `<h3 style="margin:16px 0 8px">${F.col} dei componenti</h3>
+    <div class="tabwrap"><table class="foglio"><thead><tr><th>Componente</th><th>Attuale [s]</th><th>Nuovo [s]</th><th>Differenza</th></tr></thead>
+      <tbody>${T.comp.map(c => { const nv = nuovi.get(c.id), att = stNum(c.sec); return `<tr${nv !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : fmt(att, 2)}</td>
+        <td>${nv !== undefined ? `<b>${fmt(nv, 2)}</b>` : 'resta com\'è'}</td><td>${nv !== undefined && att !== null ? `<span style="color:${nv - att > 0.004 ? '#d00000' : nv - att < -0.004 ? '#1e9e4a' : '#999'}">${nv - att > 0 ? '+' : ''}${fmt(nv - att, 2)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    <details style="margin-top:14px"><summary class="sub" style="cursor:pointer">Righe lette dal foglio (A, I, J, K) e Totale calcolato</summary>
+      <div class="tabwrap" style="margin-top:8px;max-height:420px"><table class="foglio"><thead><tr><th>Riga</th><th>Componente</th><th>N°Componenti</th><th>Coeff. [s]</th><th>TC [s]</th><th>Totale</th></tr></thead>
+        <tbody>${T.righe.map(r => `<tr><td class="sub">${r.riga}</td><td style="text-align:left">${esc(r.comp)}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td>${esc(r.coeff ?? '')}</td><td>${r.tc === null ? '' : fmtN(r.tc)}</td><td><b>${r.tot === null ? '' : fmt(r.tot, 2)}</b></td></tr>`).join('')}</tbody></table></div></details></div>`;
+  $$('#st-corpo select[data-st]').forEach(s => s.addEventListener('change', e => { T.abb[e.target.dataset.st] = e.target.value; stDisegna(); }));
+}
+async function stSalva() {
+  const T = S.st, F = ST_FASI[T.fase], nuovi = new Map();
+  for (const r of T.righe) { const id = Number(T.abb[r.comp]); if (id) nuovi.set(id, (nuovi.get(id) || 0) + (r.tot || 0)); }
+  if (!nuovi.size) return toast('Nessuna voce abbinata a un componente', 'err');
+  if (!confirm(`Scrivo ${F.col} in ${nuovi.size} componenti di ${T.pf}${T.st ? ' (' + T.st + ')' : ''}.\nI componenti non abbinati restano come sono.`)) return;
+  const mappa = {}; for (const [g, id] of Object.entries(T.abb)) { const c = T.comp.find(x => x.id === Number(id)); mappa[g] = c ? c.nome : ''; }
+  try {
+    const r = await api('/api/admin/schede-tempi/applica', { method: 'POST', body: { campo: F.campo, valori: [...nuovi].map(([id, sec]) => ({ id, sec })), mappa } });
+    T.mappa = null; toast(`${F.col} aggiornati in ${r.aggiornati} componenti`, 'ok'); stCaricaComp();
+  } catch (e) { toast(e.message, 'err'); }
+}
+function stEsporta() { // come il foglio «Scheda tempi»: Componente, N°Componenti, Coeff. [s], TC [s], Totale
+  const T = S.st, F = ST_FASI[T.fase];
+  const aoa = [[`Scheda di ${F.nome}`], [T.testa && T.testa.codice || T.file || ''], [], ['Componente', 'N°Componenti', 'Coeff. [s]', 'TC [s]', 'Totale'], ...T.righe.map(r => [r.comp, r.n, r.coeff, r.tc, r.tot === null ? '' : Math.round(r.tot * 1000) / 1000])];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Scheda tempi');
+  XLSX.writeFile(wb, `Scheda tempi ${F.nome} ${T.pf || ''}.xlsx`.replace(/\s+/g, ' '));
+}
 function vistaAnagrafiche() {
   const t = S.filtri.anaTab || 'componenti';
-  $('#vista').innerHTML = `<div class="db-testa"><div class="sotto-tab">${Object.entries(TAB).map(([k, v]) => `<button class="${k === t ? 'att' : ''}" onclick="cambiaTabDb('${k}')">${v.t}</button>`).join('')}</div>
+  $('#vista').innerHTML = `<div class="db-testa"><div class="sotto-tab">${Object.entries(TAB).map(([k, v]) => `<button class="${k === t ? 'att' : ''}" onclick="cambiaTabDb('${k}')">${v.t}</button>`).join('')}${isAdmin() ? `<button class="${t === 'schede_tempi' ? 'att' : ''}" onclick="cambiaTabDb('schede_tempi')">Schede tempi</button>` : ''}</div>
     <div id="an-extra" class="riga-flex"></div></div><div id="an-corpo"></div>`;
   if (t === 'componenti') return vistaComponentiDb();
+  if (t === 'schede_tempi') { $('#an-corpo').innerHTML = ''; return vistaSchedeTempi(); }
   $('#an-extra').innerHTML = `<span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button>
       <span class="sub" id="an-info"></span>
       <button class="btn" onclick="caricaAna(Math.max(0, Math.floor(((S.filtri.anaTot || 1) - 1) / 200) * 200), { fine: true })" title="Vai all'ultima riga della tabella">⇣ Ultima riga</button>
