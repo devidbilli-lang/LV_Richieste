@@ -77,7 +77,11 @@ input.errato{border-color:var(--rosso);background:var(--rosso-chiaro)}
 .icona:hover{background:var(--grigio-chiaro);color:var(--testo)}
 
 /* tabelle */
-.tabwrap{overflow:auto;border:1px solid var(--bordo);border-radius:var(--r);background:#fff}
+.tabwrap{overflow:auto;border:1px solid var(--bordo);border-radius:var(--r);background:#fff;position:relative}
+/* griglie «come Excel»: celle scelte, quadratino da trascinare, anteprima del riempimento */
+td.xsel [data-f]{outline:2px solid #1a73e8;outline-offset:-1px;box-shadow:inset 0 0 0 999px rgba(26,115,232,.10)}
+td.xfill [data-f]{outline:2px dashed #1a73e8;outline-offset:-1px}
+.maniglia{position:absolute;width:9px;height:9px;background:#1a73e8;border:2px solid #fff;border-radius:2px;box-shadow:0 0 0 1px #1a73e8;cursor:crosshair;z-index:6}
 table{border-collapse:collapse;width:100%}
 th,td{padding:6px 8px;border-bottom:1px dotted #c9c9c9;text-align:center;vertical-align:middle;white-space:nowrap;font-family:"Montserrat",system-ui,sans-serif}
 th{position:sticky;top:0;background:var(--ciano);font-size:13px;color:var(--testo);font-weight:500;font-style:italic;z-index:1;border-bottom:2px solid var(--ciano-bordo)}
@@ -1134,6 +1138,174 @@ function adattaCasella(el) { // solo dove il browser non sa allargare da solo le
   const t = el.tagName === 'SELECT' ? (el.options[el.selectedIndex] || {}).text || '' : el.value || el.placeholder || '';
   el.style.width = `calc(${Math.max(4, t.length + 3)}ch + 16px)`;
 }
+// --- Griglie «come Excel» (righe nuove di Inserimento Dati e componenti dell'articolo) -------------------------------
+// clic e trascina (o Maiusc + clic) per scegliere più celle · Ctrl+C / Ctrl+V anche da e verso Excel · Canc svuota
+// il quadratino blu in basso a destra si trascina in giù o in su: copia il valore e i numeri vanno avanti da soli
+// (1 → 2, 3…; «Comp 01» → «Comp 02»; date → giorno dopo). Tenendo premuto Ctrl mentre lo si trascina copia senza numerare.
+const GRIGLIE = [
+  { righeSel: '#r-tab tr.riga-nuova', chiave: 'n', aggiungi: () => { aggiungiNuova(); } },
+  { righeSel: '.tab-ce tbody tr[data-uid]', chiave: 'uid', aggiungi: () => { aggiungiCe({}, 'componente'); } },
+];
+let XS = null, xTrascina = false, xRiempi = null, xManiglia = null;
+const xCampo = td => td && td.querySelector('input[data-f], select[data-f], textarea[data-f]');
+const xOk = td => { const el = xCampo(td); return !!el && !el.disabled && !el.readOnly && el.type !== 'checkbox'; };
+const xGriglia = td => { const tr = td && td.closest('tr'); return tr ? GRIGLIE.find(g => tr.matches(g.righeSel)) : null; };
+const xRighe = g => $$(g.righeSel);
+const xColonne = tr => [...tr.cells].filter(xOk).map(td => td.cellIndex); // solo le celle che si scrivono a mano
+function xInt() { const s = XS; return s && { r0: Math.min(s.r0, s.r1), r1: Math.max(s.r0, s.r1), c0: Math.min(s.c0, s.c1), c1: Math.max(s.c0, s.c1) }; }
+function xPulisci() { XS = null; $$('td.xsel').forEach(t => t.classList.remove('xsel')); if (xManiglia) xManiglia.remove(); xManiglia = null; }
+function xMostra() {
+  $$('td.xsel').forEach(t => t.classList.remove('xsel'));
+  if (!XS) return;
+  const righe = xRighe(XS.g), I = xInt();
+  if (!righe.length || I.r1 >= righe.length) return xPulisci();
+  let ultima = null;
+  for (let r = I.r0; r <= I.r1; r++) for (const td of righe[r].cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1 && xOk(td)) { td.classList.add('xsel'); ultima = td; }
+  if (!ultima) { if (xManiglia) xManiglia.remove(); xManiglia = null; return; }
+  const w = ultima.closest('.tabwrap'); if (!w) return;
+  if (!xManiglia) { xManiglia = document.createElement('div'); xManiglia.className = 'maniglia'; xManiglia.title = 'Trascina per copiare o numerare (Ctrl: copia senza numerare)'; }
+  if (xManiglia.parentElement !== w) w.appendChild(xManiglia);
+  const el = xCampo(ultima) || ultima, rc = el.getBoundingClientRect(), wr = w.getBoundingClientRect();
+  xManiglia.style.left = (rc.right - wr.left + w.scrollLeft - 6) + 'px'; xManiglia.style.top = (rc.bottom - wr.top + w.scrollTop - 6) + 'px';
+}
+new MutationObserver(() => { if (XS && !xTrascina && !xRiempi) { clearTimeout(xMostra.t); xMostra.t = setTimeout(xMostra, 60); } }).observe(document.body, { childList: true, subtree: true });
+function xLeggi(td) { const el = xCampo(td); return el ? el.value : ''; }
+function xScrivi(g, chiave, col, v) { // scrive come se l'avesse scritto l'utente (così valgono tutti i controlli della riga)
+  const tr = $$(g.righeSel).find(t => t.dataset[g.chiave] === chiave); if (!tr) return false;
+  const td = tr.cells[col]; if (!xOk(td)) return false;
+  const el = xCampo(td); v = String(v ?? '').trim();
+  if (el.tagName === 'SELECT') {
+    const o = [...el.options].find(o => o.value === v) || [...el.options].find(o => o.textContent.trim().toLowerCase() === v.toLowerCase());
+    if (!o) return false; v = o.value;
+  } else if (el.type === 'date') { const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v); if (m) v = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false; }
+  else if (el.type === 'number') v = v.replace(/\./g, '').replace(',', '.');
+  el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}
+function xSerie(src, off, copia) { // valore dopo (off > 0) o prima (off < 0) dei valori di partenza
+  const n = src.length, p = off > 0 ? n - 1 + off : off, ciclo = src[((p % n) + n) % n];
+  if (copia || src.some(v => String(v).trim() === '')) return ciclo;
+  if (src.every(v => /^\d{4}-\d{2}-\d{2}$/.test(v))) { // date: un giorno alla volta (o il passo tra le date scelte)
+    const g = v => Date.UTC(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8, 10)) / 864e5;
+    const passo = n > 1 ? (g(src[n - 1]) - g(src[0])) / (n - 1) : 1, base = off > 0 ? g(src[n - 1]) : g(src[0]);
+    return new Date((base + passo * off) * 864e5).toISOString().slice(0, 10);
+  }
+  const num = v => /^-?\d+([.,]\d+)?$/.test(String(v).trim()) ? Number(String(v).trim().replace(',', '.')) : NaN;
+  if (src.every(v => !isNaN(num(v)))) { // numeri: + 1 (o il passo tra i numeri scelti)
+    const ns = src.map(num), passo = n > 1 ? (ns[n - 1] - ns[0]) / (n - 1) : 1, x = (off > 0 ? ns[n - 1] : ns[0]) + passo * off;
+    const dec = Math.max(...src.map(v => (String(v).split(/[.,]/)[1] || '').length)), lung = String(src[0]).trim().length;
+    let s = dec ? x.toFixed(dec) : String(Math.round(x));
+    if (!dec && /^0\d/.test(String(src[0]).trim()) && x >= 0) s = s.padStart(lung, '0'); // 007 → 008
+    return src.some(v => String(v).includes(',')) ? s.replace('.', ',') : s;
+  }
+  const re = /^(.*?)(\d+)(\D*)$/, ult = re.exec(off > 0 ? src[n - 1] : src[0]);
+  if (ult) { // testo che finisce con un numero: «Comp 01» → «Comp 02»
+    const pre = re.exec(src[0]), passo = n > 1 && pre && pre[1] === ult[1] ? (Number(re.exec(src[n - 1])[2]) - Number(pre[2])) / (n - 1) || 1 : 1;
+    const x = Number(ult[2]) + passo * off;
+    if (x >= 0) return ult[1] + String(Math.round(x)).padStart(ult[2].length, '0') + ult[3];
+  }
+  return ciclo;
+}
+document.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  if (e.target === xManiglia && XS) { e.preventDefault(); const I = xInt(); xRiempi = { ...I, g: XS.g, a: null, copia: e.ctrlKey || e.metaKey || e.altKey }; return; }
+  const td = e.target.closest('td'), g = xGriglia(td);
+  if (!g || !xOk(td)) { if (!e.target.closest('.xsel')) xPulisci(); return; }
+  const r = xRighe(g).indexOf(td.parentElement), c = td.cellIndex;
+  if (e.shiftKey && XS && XS.g === g) { e.preventDefault(); XS.r1 = r; XS.c1 = c; xMostra(); return; }
+  XS = { g, r0: r, c0: c, r1: r, c1: c }; xTrascina = true; xMostra();
+}, true);
+document.addEventListener('mousemove', e => {
+  const sotto = document.elementFromPoint(e.clientX, e.clientY), td = sotto && sotto.closest('td');
+  if (xRiempi) { // anteprima del riempimento
+    $$('td.xfill').forEach(t => t.classList.remove('xfill'));
+    const righe = xRighe(xRiempi.g), r = td ? righe.indexOf(td.parentElement) : -1;
+    xRiempi.a = r > xRiempi.r1 || (r >= 0 && r < xRiempi.r0) ? r : null;
+    if (xRiempi.a !== null) for (let k = Math.min(r, xRiempi.r0); k <= Math.max(r, xRiempi.r1); k++) if (k < xRiempi.r0 || k > xRiempi.r1)
+      for (const c of righe[k].cells) if (c.cellIndex >= xRiempi.c0 && c.cellIndex <= xRiempi.c1 && xOk(c)) c.classList.add('xfill');
+    return;
+  }
+  if (!xTrascina || !(e.buttons & 1) || !XS || !td || !xOk(td) || xGriglia(td) !== XS.g) return;
+  const r = xRighe(XS.g).indexOf(td.parentElement);
+  if (r < 0 || (r === XS.r1 && td.cellIndex === XS.c1)) return;
+  XS.r1 = r; XS.c1 = td.cellIndex;
+  if (XS.r1 !== XS.r0 || XS.c1 !== XS.c0) { const s = window.getSelection(); if (s) s.removeAllRanges(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
+  xMostra();
+});
+document.addEventListener('mouseup', e => {
+  xTrascina = false;
+  if (!xRiempi) return;
+  const F = xRiempi; xRiempi = null; $$('td.xfill').forEach(t => t.classList.remove('xfill'));
+  if (F.a === null) return;
+  const righe = xRighe(F.g), chiavi = righe.map(tr => tr.dataset[F.g.chiave]);
+  const sorg = {}; // valori di partenza per colonna
+  for (let c = F.c0; c <= F.c1; c++) { const v = []; for (let r = F.r0; r <= F.r1; r++) { const td = righe[r].cells[c]; if (xOk(td)) v.push(xLeggi(td)); } if (v.length) sorg[c] = v; }
+  const dest = F.a > F.r1 ? Array.from({ length: F.a - F.r1 }, (_, i) => [F.r1 + 1 + i, i + 1]) : Array.from({ length: F.r0 - F.a }, (_, i) => [F.r0 - 1 - i, -(i + 1)]);
+  let n = 0;
+  for (const [r, off] of dest) for (const c of Object.keys(sorg).map(Number)) {
+    const v = xSerie(sorg[c], off, F.copia);
+    if (xScrivi(F.g, chiavi[r], c, v) || (v !== sorg[c][0] && xScrivi(F.g, chiavi[r], c, xSerie(sorg[c], off, true)))) n++;
+  }
+  XS = { g: F.g, r0: Math.min(F.r0, F.a), r1: Math.max(F.r1, F.a), c0: F.c0, c1: F.c1 }; xMostra();
+  if (n) toast(`Compilate ${n} ${n === 1 ? 'cella' : 'celle'}` + (F.g.chiave === 'uid' ? ': ricorda di salvare' : ''), 'ok');
+});
+document.addEventListener('focusin', e => { // con Tab o con un clic la cella scelta segue la casella attiva
+  if (xTrascina || xRiempi) return;
+  const td = e.target.closest && e.target.closest('td'), g = xGriglia(td);
+  if (!g || !xOk(td)) return;
+  const r = xRighe(g).indexOf(td.parentElement), I = xInt();
+  if (XS && XS.g === g && r >= I.r0 && r <= I.r1 && td.cellIndex >= I.c0 && td.cellIndex <= I.c1) return;
+  XS = { g, r0: r, c0: td.cellIndex, r1: r, c1: td.cellIndex }; xMostra();
+});
+function xMatrice() { // valori delle celle scelte, riga per riga (solo quelle che si scrivono a mano)
+  const righe = xRighe(XS.g), I = xInt(), m = [];
+  for (let r = I.r0; r <= I.r1; r++) m.push([...righe[r].cells].filter(td => td.cellIndex >= I.c0 && td.cellIndex <= I.c1 && xOk(td)).map(xLeggi));
+  return m;
+}
+document.addEventListener('keydown', e => {
+  if (!XS || !document.contains(xRighe(XS.g)[0] || null)) return;
+  const I = xInt(), multi = I.r0 !== I.r1 || I.c0 !== I.c1, ae = document.activeElement;
+  let testoScelto = false; try { testoScelto = !!ae && ae.matches('input, textarea') && ae.selectionStart !== ae.selectionEnd; } catch (_) { }
+  if (e.key === 'Escape' && multi) { xPulisci(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && (multi || !testoScelto)) {
+    const m = xMatrice(), t = m.map(r => r.join('\t')).join('\n');
+    if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => { });
+    S.xAppunti = t; e.preventDefault();
+    const n = m.reduce((s, r) => s + r.length, 0); toast(`Copiat${n === 1 ? 'a 1 cella' : 'e ' + n + ' celle'}: Ctrl+V per incollare`, 'ok');
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && multi) {
+    e.preventDefault();
+    const righe = xRighe(XS.g), chiavi = righe.map(tr => tr.dataset[XS.g.chiave]);
+    for (let r = I.r0; r <= I.r1; r++) for (const c of xColonne(righe[r])) if (c >= I.c0 && c <= I.c1) xScrivi(XS.g, chiavi[r], c, '');
+    xMostra();
+  }
+});
+document.addEventListener('paste', e => {
+  if (!XS) return;
+  const ae = document.activeElement, dentro = ae && ae.closest && xGriglia(ae.closest('td'));
+  if (!dentro && !(ae === document.body)) return;
+  let t = (e.clipboardData || window.clipboardData).getData('text'); if (t == null) return;
+  t = t.replace(/\r/g, ''); if (t.endsWith('\n')) t = t.slice(0, -1);
+  const m = t.split('\n').map(r => r.split('\t')), I = xInt(), multi = I.r0 !== I.r1 || I.c0 !== I.c1, una = m.length === 1 && m[0].length === 1;
+  if (una && !multi && ae && ae.matches('input, textarea')) return; // una sola cella: incolla normale nella casella
+  e.preventDefault();
+  const g = XS.g; let righe = xRighe(g), n = 0;
+  if (una) { // un valore su tutte le celle scelte
+    const chiavi = righe.map(tr => tr.dataset[g.chiave]);
+    for (let r = I.r0; r <= I.r1; r++) for (const c of xColonne(righe[r])) if (c >= I.c0 && c <= I.c1 && xScrivi(g, chiavi[r], c, m[0][0])) n++;
+  } else { // tabella copiata (anche da Excel): dalla prima cella scelta in giù e a destra, sulle colonne che si scrivono a mano
+    while (righe.length < I.r0 + m.length) { const prima = righe.length; g.aggiungi(); righe = xRighe(g); if (righe.length === prima) break; }
+    const chiavi = righe.map(tr => tr.dataset[g.chiave]);
+    m.forEach((riga, i) => {
+      const r = I.r0 + i; if (r >= righe.length) return;
+      const cols = xColonne(righe[r]), da = cols.findIndex(c => c >= I.c0); if (da < 0) return;
+      riga.forEach((v, j) => { const c = cols[da + j]; if (c !== undefined && xScrivi(g, chiavi[r], c, v)) n++; });
+    });
+    XS = { g, r0: I.r0, r1: Math.min(I.r0 + m.length - 1, xRighe(g).length - 1), c0: I.c0, c1: I.c0 };
+  }
+  xMostra();
+  toast(n ? `Incollat${n === 1 ? 'a 1 cella' : 'e ' + n + ' celle'}` + (g.chiave === 'uid' ? ': ricorda di salvare' : '') : 'Niente da incollare: i valori non corrispondono alle voci delle caselle', n ? 'ok' : 'err');
+}, true);
 function eventiNuove() {
   const tb = $('#r-tab tbody'); if (!tb) return;
   $$('tr.riga-nuova input, tr.riga-nuova select', tb).forEach(adattaCasella);
