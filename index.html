@@ -2418,7 +2418,7 @@ async function caricaTuttiCe(daCache) {
   if ($('#ce-elenco')) $('#ce-elenco').innerHTML = '<p class="sub" style="margin:6px 4px">Carico i componenti…</p>';
   try {
     const righe = (await api('/api/admin/componenti/tutti')).righe, padri = new Set(righe.map(c => c.padre).filter(Boolean));
-    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c), princ: !c.padre && padri.has(c.chiave) })); // princ: componente principale con rinforzi (riga viola)
+    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c), princ: !c.padre })); // princ: componente principale (riga viola), con o senza rinforzi
     disegnaTuttiCe(); ripristinaTuttiCe();
   }
   catch (e) { toast(e.message, 'err'); }
@@ -2599,7 +2599,7 @@ function disegnaCe() {
       ${CE_NUM.map(k => `<col style="width:${k === 'n_pz' ? 3.8 : k === 'cns_area' ? 5 : 4.3}%">`).join('')}<col style="width:5.5%"><col><col style="width:4%"><col style="width:7.8%"><col style="width:112px"></colgroup><thead><tr>
       <th class="c-sel"><input type="checkbox" id="ce-tutti" title="Seleziona tutte le righe"></th><th>#</th><th>Componente</th><th>Rinforzo di</th><th>#Materiale</th><th>N° pz</th><th>CNS area</th><th>sec. Taglio</th><th>sec. Prep.</th><th>sec. Ting.</th><th>sec. RMA</th>
       <th class="c-ro" title="Si aggiorna da solo: non si modifica">Cod. materiale</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">Descrizione materiale</th><th class="n c-ro" title="Si aggiorna da solo: non si modifica">€</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">TM</th><th></th></tr></thead>
-    <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : nRinf(r.uid) ? 'ce-princ' : ''} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
+    <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : 'ce-princ'} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
       <td class="c-sel"><input type="checkbox" data-sel="${r.uid}" ${c.sel && c.sel.has(r.uid) ? 'checked' : ''}></td>
       <td class="sub c-centro">${i + 1}</td>
       <td class="ce-nome">${r.padreUid ? '<span class="freccia-rinf">↳</span>' : ''}<input data-f="componente" value="${esc(r.componente)}" title="${esc(r.componente)}" placeholder="${r.padreUid ? 'Nome rinforzo' : 'Nome componente'}"></td>
