@@ -86,6 +86,11 @@ td.xfill [data-f]{outline:2px dashed #1a73e8;outline-offset:-1px}
 #an-tab td[data-ed]{cursor:cell}
 tr.st-nonusa td{background:#fff3b0!important} /* Schede tempi: voce non abbinata (avviso) */
 tr.st-nonusa select{background:#ffe066;border-color:#e0a200;font-weight:600}
+td.xsel-ro{box-shadow:inset 0 0 0 2px #1a73e8!important;background-image:linear-gradient(rgba(26,115,232,.12),rgba(26,115,232,.12))!important}
+#xsomma{position:fixed;right:18px;bottom:18px;z-index:80;background:#111;color:#fff;border-radius:999px;padding:8px 16px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;gap:8px;align-items:baseline;pointer-events:none}
+#xsomma b{font-size:14px}
+#xsomma span{opacity:.4}
+#xsomma small{opacity:.7}
 .maniglia{position:absolute;width:9px;height:9px;background:#1a73e8;border:2px solid #fff;border-radius:2px;box-shadow:0 0 0 1px #1a73e8;cursor:crosshair;z-index:6}
 table{border-collapse:collapse;width:100%}
 th,td{padding:6px 8px;border-bottom:1px dotted #c9c9c9;text-align:center;vertical-align:middle;white-space:nowrap;font-family:"Montserrat",system-ui,sans-serif}
@@ -1171,7 +1176,7 @@ const xGriglia = td => { const tr = td && td.closest('tr'); return tr ? GRIGLIE.
 const xRighe = g => $$(g.righeSel);
 const xColonne = tr => [...tr.cells].filter(xOk).map(td => td.cellIndex); // solo le celle che si scrivono a mano
 function xInt() { const s = XS; return s && { r0: Math.min(s.r0, s.r1), r1: Math.max(s.r0, s.r1), c0: Math.min(s.c0, s.c1), c1: Math.max(s.c0, s.c1) }; }
-function xPulisci() { XS = null; $$('td.xsel').forEach(t => t.classList.remove('xsel')); if (xManiglia) xManiglia.remove(); xManiglia = null; }
+function xPulisci() { XS = null; $$('td.xsel').forEach(t => t.classList.remove('xsel')); if (xManiglia) xManiglia.remove(); xManiglia = null; if (typeof aggiornaSomma === 'function') aggiornaSomma(); }
 function xMostra() {
   $$('td.xsel').forEach(t => t.classList.remove('xsel'));
   if (!XS) return;
@@ -1179,6 +1184,7 @@ function xMostra() {
   if (!righe.length || I.r1 >= righe.length) return xPulisci();
   let ultima = null;
   for (let r = I.r0; r <= I.r1; r++) for (const td of righe[r].cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1 && xOk(td)) { td.classList.add('xsel'); ultima = td; }
+  if (typeof aggiornaSomma === 'function' && !RS) aggiornaSomma();
   if (!ultima) { if (xManiglia) xManiglia.remove(); xManiglia = null; return; }
   const w = ultima.closest('.tabwrap'); if (!w) return;
   if (!xManiglia) { xManiglia = document.createElement('div'); xManiglia.className = 'maniglia'; xManiglia.title = 'Trascina per copiare o numerare (Ctrl: copia senza numerare)'; }
@@ -1331,6 +1337,56 @@ document.addEventListener('paste', e => {
   if (g.tabella) { if (n) xSalvaPend().then(k => k && toast(`Incollate e salvate ${k} celle`, 'ok')); return; }
   toast(n ? `Incollat${n === 1 ? 'a 1 cella' : 'e ' + n + ' celle'}` + (g.chiave === 'uid' ? ': ricorda di salvare' : '') : 'Niente da incollare: i valori non corrispondono alle voci delle caselle', n ? 'ok' : 'err');
 }, true);
+// --- Somma delle celle scelte (come la barra di stato di Excel): in ogni tabella, anche nelle celle che non si modificano ---
+let RS = null, rsTrascina = false;
+const rsTd = el => { const td = el && el.closest && el.closest('td'); return td && td.closest('.tabwrap table') && !td.closest('thead, tfoot') ? td : null; };
+const rsNum = t => { const s = String(t ?? '').replace(/ /g, ' ').trim().replace(/\s*(€|%|s|min)$/i, ''); return /^-?\d{1,3}(\.\d{3})*(,\d+)?$|^-?\d+(,\d+)?$|^-?\d+\.\d+$/.test(s) ? Number(/,/.test(s) || /^\-?\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, '').replace(',', '.') : s) : null; };
+function rsInt(s) { return { r0: Math.min(s.r0, s.r1), r1: Math.max(s.r0, s.r1), c0: Math.min(s.c0, s.c1), c1: Math.max(s.c0, s.c1) }; }
+function aggiornaSomma() { // Somma · Media · Celle, quando le celle scelte sono almeno 2
+  let el = $('#xsomma'), celle = [];
+  if (RS && document.contains(RS.tb)) { const I = rsInt(RS); for (const tr of [...RS.tb.rows].slice(I.r0, I.r1 + 1)) for (const td of tr.cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1) celle.push(td.textContent); }
+  else if (XS && xRighe(XS.g).length) { const I = xInt(), righe = xRighe(XS.g); for (let r = I.r0; r <= Math.min(I.r1, righe.length - 1); r++) for (const td of righe[r].cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1) celle.push(xOk(td) ? xLeggi(td) : td.textContent); }
+  if (celle.length < 2) { if (el) el.remove(); return; }
+  const nums = celle.map(rsNum).filter(v => v !== null), somma = nums.reduce((a, b) => a + b, 0);
+  if (!el) { el = document.createElement('div'); el.id = 'xsomma'; document.body.appendChild(el); }
+  el.innerHTML = nums.length ? `Somma <b>${fmt(somma, 2)}</b><span>·</span>Media <b>${fmt(somma / nums.length, 2)}</b><span>·</span>Celle <b>${celle.length}</b>${nums.length < celle.length ? ` <small>(${nums.length} numeri)</small>` : ''}` : `Celle <b>${celle.length}</b> <small>(nessun numero)</small>`;
+}
+function rsPulisci() { RS = null; $$('td.xsel-ro').forEach(t => t.classList.remove('xsel-ro')); aggiornaSomma(); }
+function rsMostra() {
+  $$('td.xsel-ro').forEach(t => t.classList.remove('xsel-ro'));
+  if (!RS) return aggiornaSomma();
+  const I = rsInt(RS);
+  for (const tr of [...RS.tb.rows].slice(I.r0, I.r1 + 1)) for (const td of tr.cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1) td.classList.add('xsel-ro');
+  aggiornaSomma();
+}
+document.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const td = rsTd(e.target);
+  if (!td || e.target.closest('input, select, textarea, button, a, label, .maniglia') || xOk(td)) { if (RS) rsPulisci(); return; } // le celle che si scrivono hanno la loro selezione
+  const tb = td.parentElement.parentElement, r = [...tb.rows].indexOf(td.parentElement), c = td.cellIndex;
+  if (e.shiftKey && RS && RS.tb === tb) { e.preventDefault(); RS.r1 = r; RS.c1 = c; rsMostra(); return; }
+  RS = { tb, r0: r, c0: c, r1: r, c1: c }; rsTrascina = true; rsMostra();
+}, true);
+document.addEventListener('mousemove', e => {
+  if (!rsTrascina || !RS || !(e.buttons & 1)) return;
+  const td = rsTd(document.elementFromPoint(e.clientX, e.clientY));
+  if (!td || td.parentElement.parentElement !== RS.tb) return;
+  const r = [...RS.tb.rows].indexOf(td.parentElement);
+  if (r === RS.r1 && td.cellIndex === RS.c1) return;
+  RS.r1 = r; RS.c1 = td.cellIndex;
+  const s = window.getSelection(); if (s) s.removeAllRanges(); // niente testo evidenziato mentre si scelgono le celle
+  rsMostra();
+});
+document.addEventListener('mouseup', () => { rsTrascina = false; });
+document.addEventListener('keydown', e => { // Ctrl+C sulle celle scelte (testo come si vede)
+  if (!RS || !document.contains(RS.tb)) return;
+  if (e.key === 'Escape') return rsPulisci();
+  if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c')) return;
+  const s = window.getSelection(); if (s && String(s).trim()) return; // testo scelto a mano: copia normale
+  const I = rsInt(RS), t = [...RS.tb.rows].slice(I.r0, I.r1 + 1).map(tr => [...tr.cells].filter(td => td.cellIndex >= I.c0 && td.cellIndex <= I.c1).map(td => td.textContent.replace(/[⇊✎]/g, '').trim()).join('\t')).join('\n');
+  if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => { });
+  S.xAppunti = t; e.preventDefault(); toast('Celle copiate', 'ok');
+});
 function eventiNuove() {
   const tb = $('#r-tab tbody'); if (!tb) return;
   $$('tr.riga-nuova input, tr.riga-nuova select', tb).forEach(adattaCasella);
