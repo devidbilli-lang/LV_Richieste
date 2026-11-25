@@ -84,6 +84,8 @@ td.xfill [data-f]{outline:2px dashed #1a73e8;outline-offset:-1px}
 #an-tab td.xsel{box-shadow:inset 0 0 0 2px #1a73e8;background-image:linear-gradient(rgba(26,115,232,.10),rgba(26,115,232,.10))}
 #an-tab td.xfill{box-shadow:inset 0 0 0 2px #1a73e8;outline:1px dashed #1a73e8;outline-offset:-3px}
 #an-tab td[data-ed]{cursor:cell}
+tr.st-nonusa td{background:#fff3b0!important} /* Schede tempi: voce non abbinata (avviso) */
+tr.st-nonusa select{background:#ffe066;border-color:#e0a200;font-weight:600}
 .maniglia{position:absolute;width:9px;height:9px;background:#1a73e8;border:2px solid #fff;border-radius:2px;box-shadow:0 0 0 1px #1a73e8;cursor:crosshair;z-index:6}
 table{border-collapse:collapse;width:100%}
 th,td{padding:6px 8px;border-bottom:1px dotted #c9c9c9;text-align:center;vertical-align:middle;white-space:nowrap;font-family:"Montserrat",system-ui,sans-serif}
@@ -2501,8 +2503,8 @@ function stDisegna() {
       <button class="btn prim" onclick="stSalva()" ${T.comp && T.comp.length ? '' : 'disabled'}>Salva nei componenti</button></div>
     ${!T.pf ? '<div class="sub" style="margin-top:8px">Scegli l\'articolo per abbinare le voci ai suoi componenti.</div>' : !(T.comp || []).length ? '<div class="sub" style="margin-top:8px">L\'articolo non ha componenti nel Database.</div>' : ''}
     <div class="tabwrap" style="margin-top:10px"><table class="foglio"><thead><tr><th>Voce della scheda</th><th>Righe</th><th>Totale [s]</th><th>Componente dell'articolo</th></tr></thead>
-      <tbody>${gruppi.map(g => `<tr><td style="text-align:left">${esc(g.comp)}</td><td>${g.n}</td><td><b>${fmt(g.tot, 2)}</b></td>
-        <td><select data-st="${esc(g.comp)}" style="min-width:240px">${opz(T.abb[g.comp])}</select></td></tr>`).join('')}</tbody></table></div>
+      <tbody>${gruppi.map(g => `<tr${T.abb[g.comp] ? '' : ' class="st-nonusa"'}><td style="text-align:left">${esc(g.comp)}</td><td>${g.n}</td><td><b>${fmt(g.tot, 2)}</b></td>
+        <td><select data-st="${esc(g.comp)}" style="min-width:240px" ${T.abb[g.comp] ? '' : 'title="Voce non abbinata: i suoi secondi non vanno in nessun componente"'}>${opz(T.abb[g.comp])}</select></td></tr>`).join('')}</tbody></table></div>
     ${(T.comp || []).length ? `<h3 style="margin:16px 0 8px">${F.col} dei componenti</h3>
     <div class="tabwrap"><table class="foglio"><thead><tr><th>Componente</th><th>Attuale [s]</th><th>Nuovo [s]</th><th>Differenza</th></tr></thead>
       <tbody>${T.comp.map(c => { const nv = nuovi.get(c.id), att = stNum(c.sec); return `<tr${nv !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : fmt(att, 2)}</td>
