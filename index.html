@@ -2464,11 +2464,11 @@ const stParole = s => stNorm(s).replace(/[^a-z0-9àèéìòù ]/g, ' ').split(' 
 const ST_KEY = 'rlv_st'; // ultimo lavoro in Schede tempi: scelte in localStorage, file Excel in IndexedDB
 const stIdb = (put, val) => new Promise(res => { try { const rq = indexedDB.open(ST_KEY, 1); rq.onupgradeneeded = () => rq.result.createObjectStore('f'); rq.onerror = () => res(null);
   rq.onsuccess = () => { try { const os = rq.result.transaction('f', put ? 'readwrite' : 'readonly').objectStore('f'), r = put ? os.put(val, 'ultimo') : os.get('ultimo'); r.onsuccess = () => res(r.result ?? null); r.onerror = () => res(null); } catch (e) { res(null); } }; } catch (e) { res(null); } });
-function stMemo() { const T = S.st; if (T && !T.daRipristinare) store.set(ST_KEY, JSON.stringify({ fase: T.fase, pf: T.pf || '', pfScelto: !!T.pfScelto, st: T.st || '', abb: T.abb || {} })); }
+function stMemo() { const T = S.st; if (T && !T.daRipristinare) store.set(ST_KEY, JSON.stringify({ fase: T.fase, pf: T.pf || '', pfScelto: !!T.pfScelto, st: T.st || '', abb: T.abb || {}, man: T.man || [] })); }
 async function stRipristina() { // riapre l'ultimo file con le scelte fatte (articolo, collezione, fase, abbinamenti)
   const T = S.st, m = T.daRipristinare; delete T.daRipristinare;
   const f = await stIdb(false);
-  if (f && f.buf) { T.abbRipr = m.abb || {}; try { await caricaSheetJS(); await stApri(f.buf, f.nome); } catch (e) { delete T.abbRipr; } }
+  if (f && f.buf) { T.abbRipr = m.abb || {}; T.man = m.man || []; try { await caricaSheetJS(); await stApri(f.buf, f.nome); } catch (e) { delete T.abbRipr; } }
   else if (T.pf) stCaricaComp();
 }
 function vistaSchedeTempi() {
@@ -2486,10 +2486,10 @@ function vistaSchedeTempi() {
     <div class="sub" id="st-info" style="margin-top:10px">${stIstr(ST_FASI[T.fase])}</div></div>
     <div id="st-corpo"></div>`;
   $('#st-file').addEventListener('change', e => stLeggi(e.target.files[0]));
-  $('#st-fase').addEventListener('change', e => { T.fase = e.target.value; T.abb = {}; if (T.wb) stDaFoglio(); else stDisegna(); });
-  const scegliArt = () => { T.pf = codiceDaArt($('#st-pf').value.trim()).toUpperCase(); T.pfScelto = !!T.pf; T.nonTrovato = ''; stOpzStag(); stCaricaComp(); };
+  $('#st-fase').addEventListener('change', e => { T.fase = e.target.value; T.abb = {}; T.man = []; if (T.wb) stDaFoglio(); else stDisegna(); });
+  const scegliArt = () => { T.pf = codiceDaArt($('#st-pf').value.trim()).toUpperCase(); T.pfScelto = !!T.pf; T.nonTrovato = ''; T.man = []; stOpzStag(); stCaricaComp(); };
   $('#st-pf').addEventListener('change', scegliArt);
-  if ($('#st-stag')) $('#st-stag').addEventListener('change', e => { T.st = e.target.value; stCaricaComp(); });
+  if ($('#st-stag')) $('#st-stag').addEventListener('change', e => { T.st = e.target.value; T.man = []; stCaricaComp(); });
   stOpzStag(); if (T.righe) stDisegna(); else if (T.daRipristinare) stRipristina();
 }
 function stOpzStag() {
@@ -2503,6 +2503,7 @@ async function stLeggi(file) {
   try {
     await caricaSheetJS();
     const buf = await file.arrayBuffer();
+    S.st.man = [];
     await stApri(buf, file.name);
     stIdb(true, { nome: file.name, buf }); // resta per la prossima volta
   } catch (e) { toast('File non leggibile: ' + e.message, 'err'); }
@@ -2628,6 +2629,7 @@ function stSuggerisci() { // per ogni voce della scheda: abbinamento salvato, st
     const M = String(G.mat || '').toUpperCase(), ok = x => !x.mat || String(x.mat).toUpperCase().startsWith(M);
     const usaMat = !!(ST_FASI[T.fase].consumi && M && T.comp.some(x => x.mat && ok(x))), cand = usaMat ? T.comp.filter(ok) : T.comp;
     const salvato = T.mappa[stNorm(stChiaveMappa(G))] || (G.mat ? null : T.mappa[stNorm(g)]), perNome = n => cand.find(c => stNorm(c.nome) === stNorm(n));
+    if (salvato === '-') { T.abb[G.key] = ''; continue; } // l'ultima volta l'hai messo «non usare»
     let c = (salvato && T.comp.find(x => stNorm(x.nome) === stNorm(salvato))) || perNome(g);
     if (!c) {
       const pg = stParole(g); let best = null, sc = 0;
@@ -2665,7 +2667,7 @@ function stDisegna() {
         <tbody>${T.righe.map(r => `<tr${r.materiale ? ' style="font-weight:700;background:#f4f4f4"' : ''}><td class="sub">${r.riga}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td style="text-align:left">${esc(r.comp)}${r.materiale ? ` <small class="sub">materiale${r.desc ? ' · ' + esc(r.desc) : ''}</small>` : ''}</td><td>${r.esatto === null ? '' : fmtCns(r.esatto)}</td><td>${r.materiale || r.tot === null ? '' : `<b>${fmtCns(r.tot)}</b>`}</td></tr>`).join('')}</tbody>`
         : `<thead><tr><th>Riga</th><th>Componente</th><th>N°Componenti</th><th>Coeff. [s]</th><th>TC [s]</th><th>Totale</th></tr></thead>
         <tbody>${T.righe.map(r => `<tr><td class="sub">${r.riga}</td><td style="text-align:left">${esc(r.comp)}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td>${esc(r.coeff ?? '')}</td><td>${r.tc === null ? '' : fmtN(r.tc)}</td><td><b>${r.tot === null ? '' : fmt(r.tot, 2)}</b></td></tr>`).join('')}</tbody>`}</table></div></details></div>`;
-  $$('#st-corpo select[data-st]').forEach(s => s.addEventListener('change', e => { T.abb[e.target.dataset.st] = e.target.value; stDisegna(); }));
+  $$('#st-corpo select[data-st]').forEach(s => s.addEventListener('change', e => { T.abb[e.target.dataset.st] = e.target.value; T.man = [...new Set([...(T.man || []), e.target.dataset.st])]; stDisegna(); }));
 }
 const stBcComp = () => (S.st.comp || []).find(c => stNorm(c.nome) === 'borse complete');
 function stHtmlBc() { // Borse Complete: i tempi di tutta la borsa dal Riepilogo, minuti × 60 = secondi
@@ -2684,17 +2686,17 @@ async function stSalvaBc() {
   const valori = ST_BC.filter(f => bc[f.campo]).map(f => ({ id: c.id, campo: f.campo, sec: bc[f.campo].sec }));
   if (!valori.length) return toast('Nel Riepilogo non ci sono tempi per fase', 'err');
   if (!confirm(`Scrivo in «Borse Complete» di ${T.pf}${T.st ? ' (' + T.st + ')' : ''} i secondi di ${valori.length} fasi presi dal Riepilogo.`)) return;
-  try { await api('/api/admin/schede-tempi/applica', { method: 'POST', body: { valori } }); toast('Borse Complete aggiornata', 'ok'); stCaricaComp(); }
+  try { await api('/api/admin/schede-tempi/applica', { method: 'POST', body: { valori } }); toast('Borse Complete aggiornata', 'ok'); T.abbRipr = { ...T.abb }; stCaricaComp(); }
   catch (e) { toast(e.message, 'err'); }
 }
 async function stSalva() {
   const T = S.st, F = ST_FASI[T.fase], nuovi = new Map([...stNuovi()].map(([id, x]) => [id, x.v]));
   if (!nuovi.size) return toast('Nessuna voce abbinata a un componente', 'err');
   if (!confirm(`Scrivo ${F.col} in ${nuovi.size} componenti di ${T.pf}${T.st ? ' (' + T.st + ')' : ''}.\nI componenti non abbinati restano come sono.`)) return;
-  const mappa = {}; for (const g of stGruppi()) { const c = T.comp.find(x => x.id === Number(T.abb[g.key])); mappa[stChiaveMappa(g)] = c ? c.nome : ''; } // si ricordano per nome della voce (e materiale, nei consumi)
+  const mappa = {}, man = new Set(T.man || []); for (const g of stGruppi()) { const c = T.comp.find(x => x.id === Number(T.abb[g.key])); if (c) mappa[stChiaveMappa(g)] = c.nome; else if (man.has(g.key)) mappa[stChiaveMappa(g)] = '-'; } // '-' = non usare, scelto a mano // si ricordano per nome della voce (e materiale, nei consumi)
   try {
     const r = await api('/api/admin/schede-tempi/applica', { method: 'POST', body: { campo: F.campo, valori: [...nuovi].map(([id, sec]) => ({ id, sec })), mappa } });
-    T.mappa = null; toast(`${F.col} aggiornati in ${r.aggiornati} componenti`, 'ok'); stCaricaComp();
+    T.mappa = null; T.abbRipr = { ...T.abb }; toast(`${F.col} aggiornati in ${r.aggiornati} componenti`, 'ok'); stCaricaComp(); // gli abbinamenti restano come li hai lasciati
   } catch (e) { toast(e.message, 'err'); }
 }
 function stEsporta() { // come i fogli «Scheda tempi» e «Consumi» del file delle formule
