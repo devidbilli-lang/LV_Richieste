@@ -508,6 +508,8 @@ tr.sel td{background:#fff4d6!important}
 #r-tab .bolla{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid #f0a56b;background:radial-gradient(circle at 30% 25%,#fff 0,#fff1e6 45%,#fcc9a0 100%);box-shadow:0 2px 4px rgba(0,0,0,.18),inset 0 -2px 3px rgba(0,0,0,.07),inset 0 2px 2px rgba(255,255,255,.9);font-weight:600;white-space:nowrap;line-height:1.4}
 #r-tab tr.riga-nuova td[data-k="sku"] input{border-radius:999px;border:1px solid #f0a56b;background:radial-gradient(circle at 30% 25%,#fff 0,#fff1e6 45%,#fcc9a0 100%);box-shadow:0 2px 4px rgba(0,0,0,.18),inset 0 -2px 3px rgba(0,0,0,.07),inset 0 2px 2px rgba(255,255,255,.9);padding-left:18px;padding-right:12px;font-weight:600;transition:transform .12s,box-shadow .12s}
 #r-tab tr.riga-nuova td[data-k="sku"] input:focus{outline:none;transform:scale(1.04);box-shadow:0 0 0 3px rgba(251,138,60,.4),0 3px 6px rgba(0,0,0,.2),inset 0 2px 2px rgba(255,255,255,.9)}
+.av-date{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tenue);white-space:nowrap} /* Avanzamento: date nella barra dei filtri */
+.av-date input.filtro-sel{padding:5px 10px}
 </style>
 </head>
 <body>
@@ -1865,16 +1867,17 @@ async function confermaAssegna(aggiungi) {
 const REPARTI = [['taglio', 'Taglio', true], ['prep', 'Preparazione', true], ['ting', 'Tingitura', true], ['rma', 'RMA', true], ['assemblaggio', 'Assemblaggio', false]];
 function vistaAvanzamento() {
   const f = S.filtri.av || (S.filtri.av = { stato: 'aperte', q: '', dal: '', al: '' });
-  $('#vista').innerHTML = `<div class="card no-print"><div class="griglia">
-      <label class="campo">Stato<select id="av-stato">${[['aperte', 'Aperte'], ['chiuse', 'Chiuse'], ['', 'Tutte']].map(([k, t]) => `<option value="${k}" ${f.stato === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label class="campo">Elaborate dal<input type="date" id="av-dal" value="${esc(f.dal)}"></label>
-      <label class="campo">al<input type="date" id="av-al" value="${esc(f.al)}"></label>
-      <label class="campo largo">Cerca<input id="av-q" value="${esc(f.q)}" placeholder="N°, articolo, richiedente, note…"></label>
-    </div><div class="riga-flex" style="margin-top:12px"><button class="btn prim" onclick="caricaAvanzamento()">Cerca</button>
-      <span class="sub" id="av-info"></span></div></div>
+  // filtri su una riga sola come in Inserimento dati: il foglio sale in alto
+  $('#vista').innerHTML = `<div class="filtri no-print">
+      <div class="filtro-cerca"><input id="av-q" value="${esc(f.q)}" placeholder="Cerca…" title="N°, articolo, richiedente, note…" autocomplete="off"></div>
+      <select id="av-stato" class="filtro-sel" title="Stato">${[['aperte', 'Aperte'], ['chiuse', 'Chiuse'], ['', 'Tutte']].map(([k, t]) => `<option value="${k}" ${f.stato === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <label class="av-date" title="Elaborate dal … al …">Elaborate dal<input type="date" id="av-dal" class="filtro-sel" value="${esc(f.dal)}">al<input type="date" id="av-al" class="filtro-sel" value="${esc(f.al)}"></label>
+      <span class="sub" id="av-info"></span>
+    </div>
     <div id="av-tab"><div class="vuoto">Caricamento…</div></div>`;
-  $$('#vista .card select, #vista .card input[type=date]').forEach(el => el.addEventListener('change', caricaAvanzamento));
-  $('#av-q').addEventListener('keydown', e => { if (e.key === 'Enter') caricaAvanzamento(); });
+  $$('#av-stato, #av-dal, #av-al').forEach(el => el.addEventListener('change', caricaAvanzamento));
+  let tq; $('#av-q').addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(caricaAvanzamento, 400); });
+  $('#av-q').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(tq); caricaAvanzamento(); } });
   if (isMag()) fabDb('Nuova richiesta senza righe', nuovaRichiestaManuale);
   caricaAvanzamento();
 }
