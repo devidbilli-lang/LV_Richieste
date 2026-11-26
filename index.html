@@ -538,6 +538,7 @@ const LOCALE_NUM = 'de-DE';
 const nf = {};
 const fmt = (n, d = 2) => (n === null || n === undefined || n === '' || isNaN(n)) ? '' :
   (nf[d] || (nf[d] = new Intl.NumberFormat(LOCALE_NUM, { minimumFractionDigits: d, maximumFractionDigits: d }))).format(Number(n));
+const fmtCns = n => (n === null || n === undefined || n === '' || isNaN(n)) ? '' : (nf.c || (nf.c = new Intl.NumberFormat(LOCALE_NUM, { maximumFractionDigits: 10 }))).format(Number(n)); // CNS: tutti i decimali
 const fmtN = n => (n === null || n === undefined || n === '' || isNaN(n)) ? '' : (nf.n || (nf.n = new Intl.NumberFormat(LOCALE_NUM, { maximumFractionDigits: 2 }))).format(Number(n));
 const dIt = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : '';
 const dCorta = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(2, 4)}` : '';
@@ -1634,7 +1635,7 @@ function formRiga(r, pre) {
       <div>Codice materiale<b>${esc(r.codice_materiale || '')}</b></div><div>Responsabilità<b>${esc(r.responsabilita || '')}</b></div><div>Macro categoria<b>${esc(r.macro_categoria || '')}</b></div>
       <div>Min. taglio<b>${fmt(r.min_taglio, 2)}</b></div><div>Min. preparazione<b>${fmt(r.min_prep, 2)}</b></div><div>Min. tingitura<b>${fmt(r.min_ting, 2)}</b></div><div>Min. RMA<b>${fmt(r.min_rma, 2)}</b></div>
       <div>Totale minuti<b>${fmt(r.totale_minuti, 2)}</b></div><div>N° pz<b>${fmtN(r.n_pz)}</b></div>
-      <div>CNS area<b>${fmtN(r.cns_area)}</b></div><div>€ materiale<b>${fmt(r.prezzo, 2)}</b></div><div>TDP<b>${fmtN(r.tdp)}</b></div><div>Totale €<b>${fmt(r.totale_eur, 2)}</b></div>
+      <div>CNS area<b>${fmtCns(r.cns_area)}</b></div><div>€ materiale<b>${fmt(r.prezzo, 2)}</b></div><div>TDP<b>${fmtN(r.tdp)}</b></div><div>Totale €<b>${fmt(r.totale_eur, 2)}</b></div>
     </div>
     <p class="sub" style="margin:10px 0 0">Minuti ed € sono fissati al salvataggio: si ricalcolano solo se cambi componente, pz KO, motivazione o materiale.${r.origine === 'import' ? ' Riga importata dal foglio.' : ''}</p>`}`;
   const piede = nuova ? `<button class="btn" onclick="chiudiForm()">Annulla</button><button class="btn" id="e-ok2" onclick="salvaForm(null, true)">Salva e aggiungi un'altra</button><button class="btn prim" id="e-ok" onclick="salvaForm(null)">Salva</button>`
@@ -2453,14 +2454,26 @@ function cambiaTabDb(k) {
 const ST_FASI = { prep: { foglio: 'preparazione', campo: 'sec_prep', nome: 'Preparazione', col: 'Sec. prep.' }, taglio: { foglio: 'taglio', campo: 'sec_taglio', nome: 'Taglio', col: 'Sec. taglio' },
   cns: { consumi: true, campo: 'cns_area', nome: 'Consumi', col: 'CNS area' } }; // Consumi: colonne Pezzi, Codice materiale/Pezzo, Esatto → CNS = Esatto ÷ Pezzi
 const stIstr = F => F.consumi ? 'Carica il file dei consumi: dal foglio «Materiali e componenti» si leggono le colonne Pezzi, Codice materiale/Pezzo e Netto (o Esatto) e si calcola CNS = Netto ÷ Pezzi.' : `Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${F.nome}».`;
-const stDec = () => ST_FASI[S.st.fase].consumi ? 4 : 2; // CNS con 4 decimali, secondi con 2
+const stDec = () => ST_FASI[S.st.fase].consumi ? 10 : 2;
+const stF = v => ST_FASI[S.st.fase].consumi ? fmtCns(v) : fmt(v, 2); // CNS con tutti i decimali, secondi con 2
 const ST_BC = [{ rep: 'taglio', campo: 'sec_taglio', nome: 'Taglio' }, { rep: 'preparazione', campo: 'sec_prep', nome: 'Preparazione' }, { rep: 'rma', campo: 'sec_rma', nome: 'RMA' }, { rep: 'prima tingitura', campo: 'sec_ting', nome: 'Prima tingitura' }];
 const stNorm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 const stNum = v => { if (v === null || v === undefined || v === '') return null; if (typeof v === 'number') return v; const m = String(v).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
 const stTotale = r => r.tc === null ? null : (r.n !== null && r.n >= 1 ? r.tc / r.n : r.tc); // =SE($B="";"";SE($B>=1;$D/$B;$D))
 const stParole = s => stNorm(s).replace(/[^a-z0-9àèéìòù ]/g, ' ').split(' ').filter(w => w.length > 1 && !['x', 'di', 'del', 'della', 'su', 'per', 'con'].includes(w));
+const ST_KEY = 'rlv_st'; // ultimo lavoro in Schede tempi: scelte in localStorage, file Excel in IndexedDB
+const stIdb = (put, val) => new Promise(res => { try { const rq = indexedDB.open(ST_KEY, 1); rq.onupgradeneeded = () => rq.result.createObjectStore('f'); rq.onerror = () => res(null);
+  rq.onsuccess = () => { try { const os = rq.result.transaction('f', put ? 'readwrite' : 'readonly').objectStore('f'), r = put ? os.put(val, 'ultimo') : os.get('ultimo'); r.onsuccess = () => res(r.result ?? null); r.onerror = () => res(null); } catch (e) { res(null); } }; } catch (e) { res(null); } });
+function stMemo() { const T = S.st; if (T && !T.daRipristinare) store.set(ST_KEY, JSON.stringify({ fase: T.fase, pf: T.pf || '', pfScelto: !!T.pfScelto, st: T.st || '', abb: T.abb || {} })); }
+async function stRipristina() { // riapre l'ultimo file con le scelte fatte (articolo, collezione, fase, abbinamenti)
+  const T = S.st, m = T.daRipristinare; delete T.daRipristinare;
+  const f = await stIdb(false);
+  if (f && f.buf) { T.abbRipr = m.abb || {}; try { await caricaSheetJS(); await stApri(f.buf, f.nome); } catch (e) { delete T.abbRipr; } }
+  else if (T.pf) stCaricaComp();
+}
 function vistaSchedeTempi() {
-  const T = S.st || (S.st = { fase: 'prep' });
+  if (!S.st) { let m = null; try { m = JSON.parse(store.get(ST_KEY) || 'null'); } catch (e) {} S.st = { fase: 'prep' }; if (m) Object.assign(S.st, { fase: ST_FASI[m.fase] ? m.fase : 'prep', pf: m.pf || '', pfScelto: !!m.pfScelto, st: m.st || '', daRipristinare: m }); }
+  const T = S.st;
   $('#an-extra').innerHTML = '';
   $('#an-corpo').innerHTML = `<div class="card">
     <div class="riga-flex" style="gap:14px;align-items:flex-end">
@@ -2477,7 +2490,7 @@ function vistaSchedeTempi() {
   const scegliArt = () => { T.pf = codiceDaArt($('#st-pf').value.trim()).toUpperCase(); T.pfScelto = !!T.pf; T.nonTrovato = ''; stOpzStag(); stCaricaComp(); };
   $('#st-pf').addEventListener('change', scegliArt);
   if ($('#st-stag')) $('#st-stag').addEventListener('change', e => { T.st = e.target.value; stCaricaComp(); });
-  stOpzStag(); if (T.righe) stDisegna();
+  stOpzStag(); if (T.righe) stDisegna(); else if (T.daRipristinare) stRipristina();
 }
 function stOpzStag() {
   const T = S.st, sel = $('#st-stag'); if (!sel) return;
@@ -2487,11 +2500,18 @@ function stOpzStag() {
 }
 async function stLeggi(file) {
   if (!file) return;
-  const T = S.st;
   try {
     await caricaSheetJS();
-    T.wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
-    T.file = file.name;
+    const buf = await file.arrayBuffer();
+    await stApri(buf, file.name);
+    stIdb(true, { nome: file.name, buf }); // resta per la prossima volta
+  } catch (e) { toast('File non leggibile: ' + e.message, 'err'); }
+}
+async function stApri(buf, nome) {
+  const T = S.st;
+  {
+    T.wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    T.file = nome;
     // testata dal foglio Riepilogo (se c'è) e codice articolo dal nome della scheda (ST0_<codice>_…) o dal Codice PLM
     const rie = T.wb.Sheets[T.wb.SheetNames.find(n => /riepilogo/i.test(n)) || ''];
     const cella = (ws, ref) => ws && ws[ref] ? ws[ref].v : '';
@@ -2501,7 +2521,7 @@ async function stLeggi(file) {
       const rep = stNorm(cella(rie, 'E' + i)), f = ST_BC.find(x => x.rep === rep), min = stNum(cella(rie, 'F' + i));
       if (f && min !== null && T.bc[f.campo] === undefined) T.bc[f.campo] = { min, sec: min * 60 };
     }
-    let cods = [(/^ST\d*_([A-Z0-9]+)/i.exec(String(T.testa.codice || file.name)) || [])[1]].filter(Boolean);
+    let cods = [(/^ST\d*_([A-Z0-9]+)/i.exec(String(T.testa.codice || nome)) || [])[1]].filter(Boolean);
     const fc = T.wb.Sheets[T.wb.SheetNames.find(stFoglioConsumi) || ''];
     if (!cods.length && fc) { // consumi: «Computo materiali articolo AP5266 B28230 …» → AP5266.B28230, poi AP5266
       const tk = (/articolo\s+(.+)/i.exec(String(cella(fc, 'A1'))) || [, ''])[1].trim().split(/[\s.]+/), pz = [];
@@ -2515,7 +2535,7 @@ async function stLeggi(file) {
       if (k.length) { T.pf = k[0]; $('#st-pf').value = k[0]; stOpzStag(); } else T.nonTrovato = cods[0];
     }
     stDaFoglio();
-  } catch (e) { toast('File non leggibile: ' + e.message, 'err'); }
+  }
 }
 const stFoglioConsumi = n => /^materiali e compon/.test(stNorm(n).replace(/&/g, ' e ').replace(/\s+/g, ' ')); // il foglio «Materiali e componenti»
 function stDaConsumi() { // Consumi: foglio «Materiali e componenti», colonne Pezzi / Codice materiale/Pezzo / Esatto
@@ -2593,7 +2613,8 @@ async function stCaricaComp() {
     const [d, m] = await Promise.all([api('/api/admin/componenti', { query: T.st !== undefined && $('#st-stag') ? { pf: T.pf, stagione: T.st || '' } : { pf: T.pf } }), T.mappa ? Promise.resolve({ mappa: T.mappa }) : api('/api/admin/schede-tempi/mappa')]);
     T.mappa = m.mappa || {};
     T.comp = (d.componenti || []).map(c => ({ id: c.id, nome: String(c.componente || '').replace(T.pf + '-', '').replace(new RegExp('^' + T.pf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*-\\s*'), ''), sec: c[ST_FASI[T.fase].campo], mat: c.codice_materiale || '', tutti: { sec_taglio: c.sec_taglio, sec_prep: c.sec_prep, sec_rma: c.sec_rma, sec_ting: c.sec_ting, cns_area: c.cns_area } }));
-    T.abb = {}; stSuggerisci();
+    T.abb = {}; if (T.abbRipr) { for (const [k, id] of Object.entries(T.abbRipr)) if (id === '' || T.comp.some(c => c.id === Number(id))) T.abb[k] = id; delete T.abbRipr; } // abbinamenti dell'ultima volta
+    stSuggerisci();
   } catch (e) { toast(e.message, 'err'); T.comp = []; }
   stDisegna();
 }
@@ -2618,7 +2639,7 @@ function stSuggerisci() { // per ogni voce della scheda: abbinamento salvato, st
 }
 function stDisegna() {
   const T = S.st, box = $('#st-corpo'); if (!box) return;
-  const F = ST_FASI[T.fase]; T.abb = T.abb || {};
+  const F = ST_FASI[T.fase]; T.abb = T.abb || {}; stMemo();
   if ($('#st-info')) $('#st-info').innerHTML = T.wb ? `<b>${esc(T.file)}</b> · foglio «${esc(T.foglio || F.nome)}» · ${fmtN((T.righe || []).length)} righe${T.testa && T.testa.nome ? ` · ${esc(T.testa.nome)}` : ''}${T.testa && T.testa.brand ? ` · ${esc(T.testa.brand)}` : ''}${T.nonTrovato ? ` · <span style="color:var(--rosso)">articolo ${esc(T.nonTrovato)} non trovato nel Database: sceglilo a mano</span>` : ''}` : stIstr(F);
   if (!T.righe) { box.innerHTML = ''; return; }
   const gruppi = stGruppi(), nv = stNuovi(), D = stDec(), cons = !!F.consumi, um = cons ? '' : ' [s]';
@@ -2631,17 +2652,17 @@ function stDisegna() {
       <button class="btn prim" onclick="stSalva()" ${T.comp && T.comp.length ? '' : 'disabled'}>Salva nei componenti</button></div>
     ${!T.pf ? '<div class="sub" style="margin-top:8px">Scegli l\'articolo per abbinare le voci ai suoi componenti.</div>' : !(T.comp || []).length ? '<div class="sub" style="margin-top:8px">L\'articolo non ha componenti nel Database.</div>' : ''}
     <div class="tabwrap" style="margin-top:10px"><table class="foglio"><thead><tr><th>Voce ${cons ? 'del file' : 'della scheda'}</th>${cons ? '<th>Materiale</th>' : ''}<th>Righe</th><th>${cons ? 'CNS per pezzo' : 'Totale [s]'}</th><th>Componente dell'articolo</th></tr></thead>
-      <tbody>${gruppi.map(g => { const md = matDiverso(g, T.abb[g.key]); return `<tr${T.abb[g.key] ? '' : ' class="st-nonusa"'}><td style="text-align:left">${esc(g.comp)}</td>${cons ? `<td>${esc(g.mat)}${g.matDesc ? `<div class="sub" style="font-size:11px">${esc(g.matDesc)}</div>` : ''}</td>` : ''}<td>${g.n}</td><td><b>${fmt(g.tot, D)}</b></td>
+      <tbody>${gruppi.map(g => { const md = matDiverso(g, T.abb[g.key]); return `<tr${T.abb[g.key] ? '' : ' class="st-nonusa"'}><td style="text-align:left">${esc(g.comp)}</td>${cons ? `<td>${esc(g.mat)}${g.matDesc ? `<div class="sub" style="font-size:11px">${esc(g.matDesc)}</div>` : ''}</td>` : ''}<td>${g.n}</td><td><b>${stF(g.tot)}</b></td>
         <td><select data-st="${esc(g.key)}" style="min-width:240px" ${T.abb[g.key] ? '' : `title="Voce non abbinata: ${cons ? 'il suo consumo non va' : 'i suoi secondi non vanno'} in nessun componente"`}>${opz(T.abb[g.key])}</select>${md ? `<div class="sub" style="color:#b06000;margin-top:3px">⚠ nel Database il componente ha il materiale ${esc(md)}</div>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
     ${(T.comp || []).length ? `<h3 style="margin:16px 0 8px">${F.col} dei componenti</h3>
     <div class="tabwrap"><table class="foglio"><thead><tr><th>Componente</th><th>Attuale${um}</th><th>Nuovo${um}</th><th>Differenza</th></tr></thead>
-      <tbody>${T.comp.map(c => { const x = nv.get(c.id), nuovo = x ? x.v : undefined, att = stNum(c.sec), eps = cons ? 0.00005 : 0.004; return `<tr${nuovo !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : fmt(att, D)}</td>
-        <td>${nuovo !== undefined ? `<b>${fmt(nuovo, D)}</b>${cons && x.n > 1 ? ` <small class="sub">(media di ${x.n} voci)</small>` : ''}` : 'resta com\'è'}</td><td>${nuovo !== undefined && att !== null ? `<span style="color:${nuovo - att > eps ? '#d00000' : nuovo - att < -eps ? '#1e9e4a' : '#999'}">${nuovo - att > 0 ? '+' : ''}${fmt(nuovo - att, D)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+      <tbody>${T.comp.map(c => { const x = nv.get(c.id), nuovo = x ? x.v : undefined, att = stNum(c.sec), eps = cons ? 0.00005 : 0.004; return `<tr${nuovo !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : stF(att)}</td>
+        <td>${nuovo !== undefined ? `<b>${stF(nuovo)}</b>${cons && x.n > 1 ? ` <small class="sub">(media di ${x.n} voci)</small>` : ''}` : 'resta com\'è'}</td><td>${nuovo !== undefined && att !== null ? `<span style="color:${nuovo - att > eps ? '#d00000' : nuovo - att < -eps ? '#1e9e4a' : '#999'}">${nuovo - att > 0 ? '+' : ''}${stF(nuovo - att)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
     ${cons ? '' : stHtmlBc()}
     <details style="margin-top:14px"><summary class="sub" style="cursor:pointer">Righe lette ${cons ? '(Pezzi, Codice materiale/Pezzo, Esatto) e CNS calcolato' : 'dal foglio (A, I, J, K) e Totale calcolato'}</summary>
       <div class="tabwrap" style="margin-top:8px;max-height:420px"><table class="foglio">${cons
         ? `<thead><tr><th>Riga</th><th>Pezzi</th><th>Codice materiale/Pezzo</th><th>Netto / Esatto</th><th>CNS per pezzo</th></tr></thead>
-        <tbody>${T.righe.map(r => `<tr${r.materiale ? ' style="font-weight:700;background:#f4f4f4"' : ''}><td class="sub">${r.riga}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td style="text-align:left">${esc(r.comp)}${r.materiale ? ` <small class="sub">materiale${r.desc ? ' · ' + esc(r.desc) : ''}</small>` : ''}</td><td>${r.esatto === null ? '' : fmt(r.esatto, 4)}</td><td>${r.materiale || r.tot === null ? '' : `<b>${fmt(r.tot, 4)}</b>`}</td></tr>`).join('')}</tbody>`
+        <tbody>${T.righe.map(r => `<tr${r.materiale ? ' style="font-weight:700;background:#f4f4f4"' : ''}><td class="sub">${r.riga}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td style="text-align:left">${esc(r.comp)}${r.materiale ? ` <small class="sub">materiale${r.desc ? ' · ' + esc(r.desc) : ''}</small>` : ''}</td><td>${r.esatto === null ? '' : fmtCns(r.esatto)}</td><td>${r.materiale || r.tot === null ? '' : `<b>${fmtCns(r.tot)}</b>`}</td></tr>`).join('')}</tbody>`
         : `<thead><tr><th>Riga</th><th>Componente</th><th>N°Componenti</th><th>Coeff. [s]</th><th>TC [s]</th><th>Totale</th></tr></thead>
         <tbody>${T.righe.map(r => `<tr><td class="sub">${r.riga}</td><td style="text-align:left">${esc(r.comp)}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td>${esc(r.coeff ?? '')}</td><td>${r.tc === null ? '' : fmtN(r.tc)}</td><td><b>${r.tot === null ? '' : fmt(r.tot, 2)}</b></td></tr>`).join('')}</tbody>`}</table></div></details></div>`;
   $$('#st-corpo select[data-st]').forEach(s => s.addEventListener('change', e => { T.abb[e.target.dataset.st] = e.target.value; stDisegna(); }));
@@ -2679,7 +2700,7 @@ async function stSalva() {
 function stEsporta() { // come i fogli «Scheda tempi» e «Consumi» del file delle formule
   const T = S.st, F = ST_FASI[T.fase];
   if (F.consumi) {
-    const aoa = [['', 'Pezzi', 'Codice materiale/Pezzo', 'Esatto', '', 'CNS per pezzo'], ...T.righe.map(r => ['', r.n, r.comp, r.esatto, '', r.materiale || r.tot === null ? '' : Math.round(r.tot * 1e6) / 1e6])];
+    const aoa = [['', 'Pezzi', 'Codice materiale/Pezzo', 'Esatto', '', 'CNS per pezzo'], ...T.righe.map(r => ['', r.n, r.comp, r.esatto, '', r.materiale || r.tot === null ? '' : r.tot])];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Consumi');
     return XLSX.writeFile(wb, `Consumi ${T.pf || ''}.xlsx`.replace(/\s+/g, ' '));
   }
@@ -2982,7 +3003,7 @@ function disegnaTuttiCe() {
   const lista = tutte.filter(c => t.vedi === 'tutti' || (t.vedi === 'manca' ? c.manca.length : !c.manca.length));
   const nManca = tutte.filter(c => c.manca.length).length;
   const pagina = lista; // tutte le righe in un'unica tabella da scorrere
-  const val = (c, k, tipo) => vuoto(c[k]) ? '' : tipo === 'e' ? fmt(c[k], 2) : tipo === 'n' ? fmtN(c[k]) : esc(c[k]);
+  const val = (c, k, tipo) => vuoto(c[k]) ? '' : tipo === 'e' ? fmt(c[k], 2) : tipo === 'n' ? (k === 'cns_area' ? fmtCns(c[k]) : fmtN(c[k])) : esc(c[k]);
   const nome = c => esc(String(c.componente || '').replace(c.codice_pf + '-', ''));
   const barra = $('#ct-barra');
   if (barra && !$('#ct-q')) { // la barra si disegna una volta: la ricerca non perde il cursore
@@ -3327,7 +3348,7 @@ async function caricaAna(offset = 0, opz = {}) {
     $('#an-info').textContent = `${fmtN(r.totale)} record${r.totale > 200 ? ` · ${offset + 1}-${offset + r.righe.length}` : ''}`;
     S.filtri.anaTot = r.totale; S.filtri.anaOff = offset;
     $('#an-tab').innerHTML = `<div class="tabwrap tab-alta"><table><thead><tr><th class="c-sel"><input type="checkbox" id="an-tutti" title="Seleziona tutte le righe della pagina"></th>${cfg.c.map(c => `<th class="${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}" ${c[2] === 'ro' ? 'title="Calcolata: non si modifica"' : ''}>${c[1]}</th>`).join('')}<th></th></tr></thead>
-      <tbody>${r.righe.map((x, i) => `<tr data-id="${x.id}" class="${S.selAna.has(x.id) ? 'sel' : ''}"><td class="c-sel"><input type="checkbox" data-sel="${x.id}" ${S.selAna.has(x.id) ? 'checked' : ''}></td>${cfg.c.map(c => `<td data-k="${c[0]}"${c[2] !== 'ro' && !(NON_COPIABILI[t] || []).includes(c[0]) ? ' data-ed="1"' : ''} class="${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}">${c[2] === 'n' ? fmtN(x[c[0]]) : esc(x[c[0]] ?? '')}</td>`).join('')}
+      <tbody>${r.righe.map((x, i) => `<tr data-id="${x.id}" class="${S.selAna.has(x.id) ? 'sel' : ''}"><td class="c-sel"><input type="checkbox" data-sel="${x.id}" ${S.selAna.has(x.id) ? 'checked' : ''}></td>${cfg.c.map(c => `<td data-k="${c[0]}"${c[2] !== 'ro' && !(NON_COPIABILI[t] || []).includes(c[0]) ? ' data-ed="1"' : ''} class="${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}">${c[2] === 'n' ? (c[0] === 'cns_area' ? fmtCns(x[c[0]]) : fmtN(x[c[0]])) : esc(x[c[0]] ?? '')}</td>`).join('')}
         <td><button class="icona" onclick="editAna(${i})">✎</button></td></tr>`).join('')}</tbody></table></div>
       <div class="riga-flex" style="justify-content:center;margin:10px">${offset > 0 ? `<button class="btn" onclick="caricaAna(${Math.max(0, offset - 200)})">← Precedenti</button>` : ''}
         ${offset + r.righe.length < r.totale ? `<button class="btn" onclick="caricaAna(${offset + 200})">Successivi →</button>` : ''}</div>`;
