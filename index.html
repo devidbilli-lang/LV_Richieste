@@ -2957,14 +2957,14 @@ const TC_COL = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz', 'n'], ['cns_ar
 const CALCOLATI = new Set(['codice_materiale', 'descr_materiale', 'prezzo', 'tdp', 'um', 'tm']);
 const DERIVATI = { codice_materiale: 'manca in Distinta base per la tipologia', prezzo: 'manca in Items BC', tdp: 'manca nella tabella TDP' };
 const vuoto = v => v === null || v === undefined || String(v).trim() === '';
-function mancantiCe(c) {
+function mancantiCe(c, conRinforzi) { // conRinforzi: principale con rinforzi → il materiale sta nei rinforzi (anche più materiali diversi)
   const acc = /ACCESSORIO/i.test(c.n_materiale || '') || c.tm === 'Accessorio', m = [];
   const inf = /INFUSTITURA/i.test(c.n_materiale || '') || c.tm === 'Infustitura';
-  if (vuoto(c.n_materiale)) m.push('n_materiale');
+  if (vuoto(c.n_materiale) && !conRinforzi) m.push('n_materiale');
   if (inf) { if (vuoto(c.sec_taglio)) m.push('sec_taglio'); } // le infustiture si segnalano solo se manca il tempo di taglio
   else if (!acc) { // gli accessori non hanno lavorazioni
     if (vuoto(c.n_pz)) m.push('n_pz');
-    if (vuoto(c.cns_area)) m.push('cns_area');
+    if (vuoto(c.cns_area) && !conRinforzi) m.push('cns_area');
     if (vuoto(c.sec_taglio)) m.push('sec_taglio');
     if (vuoto(c.sec_prep)) m.push('sec_prep');
   }
@@ -2979,7 +2979,7 @@ async function caricaTuttiCe(daCache) {
   if ($('#ce-elenco')) $('#ce-elenco').innerHTML = '<p class="sub" style="margin:6px 4px">Carico i componenti…</p>';
   try {
     const righe = (await api('/api/admin/componenti/tutti')).righe, padri = new Set(righe.map(c => c.padre).filter(Boolean));
-    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c), princ: !c.padre })); // princ: componente principale (riga viola), con o senza rinforzi
+    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c, !c.padre && padri.has(c.chiave)), princ: !c.padre })); // padre = chiave del principale // princ: componente principale (riga viola), con o senza rinforzi
     disegnaTuttiCe(); ripristinaTuttiCe();
   }
   catch (e) { toast(e.message, 'err'); }
