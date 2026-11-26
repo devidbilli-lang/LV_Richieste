@@ -2450,7 +2450,10 @@ function cambiaTabDb(k) {
    della fase (Componente, N°Componenti, Coeff. [s], TC [s]) e si calcola il Totale come nel foglio «Formula per schede tempi»:
    Totale = SE(N° ≥ 1; TC ÷ N°; TC). Le voci della scheda si abbinano ai componenti dell'articolo e la somma dei Totali
    di ogni componente va nei suoi secondi della fase. --- */
-const ST_FASI = { prep: { foglio: 'preparazione', campo: 'sec_prep', nome: 'Preparazione', col: 'Sec. prep.' }, taglio: { foglio: 'taglio', campo: 'sec_taglio', nome: 'Taglio', col: 'Sec. taglio' } };
+const ST_FASI = { prep: { foglio: 'preparazione', campo: 'sec_prep', nome: 'Preparazione', col: 'Sec. prep.' }, taglio: { foglio: 'taglio', campo: 'sec_taglio', nome: 'Taglio', col: 'Sec. taglio' },
+  cns: { consumi: true, campo: 'cns_area', nome: 'Consumi', col: 'CNS area' } }; // Consumi: colonne Pezzi, Codice materiale/Pezzo, Esatto → CNS = Esatto ÷ Pezzi
+const stIstr = F => F.consumi ? 'Carica il file dei consumi: si leggono le colonne Pezzi, Codice materiale/Pezzo ed Esatto e si calcola CNS = Esatto ÷ Pezzi.' : `Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${F.nome}».`;
+const stDec = () => ST_FASI[S.st.fase].consumi ? 4 : 2; // CNS con 4 decimali, secondi con 2
 const ST_BC = [{ rep: 'taglio', campo: 'sec_taglio', nome: 'Taglio' }, { rep: 'preparazione', campo: 'sec_prep', nome: 'Preparazione' }, { rep: 'rma', campo: 'sec_rma', nome: 'RMA' }, { rep: 'prima tingitura', campo: 'sec_ting', nome: 'Prima tingitura' }];
 const stNorm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 const stNum = v => { if (v === null || v === undefined || v === '') return null; if (typeof v === 'number') return v; const m = String(v).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
@@ -2461,16 +2464,16 @@ function vistaSchedeTempi() {
   $('#an-extra').innerHTML = '';
   $('#an-corpo').innerHTML = `<div class="card">
     <div class="riga-flex" style="gap:14px;align-items:flex-end">
-      <label class="campo">Scheda tempi (Excel)<input type="file" id="st-file" accept=".xlsx,.xlsm,.xls" style="width:auto"></label>
+      <label class="campo">File Excel<input type="file" id="st-file" accept=".xlsx,.xlsm,.xls" style="width:auto"></label>
       <label class="campo">Fase<select id="st-fase" style="width:auto">${Object.entries(ST_FASI).map(([k, f]) => `<option value="${k}" ${T.fase === k ? 'selected' : ''}>${f.nome} → ${f.col}</option>`).join('')}</select></label>
       <label class="campo largo">Articolo<input id="st-pf" list="dl-st-art" value="${esc(T.pf || '')}" placeholder="Codice PF…" autocomplete="off" style="width:280px"></label>
       <datalist id="dl-st-art">${[...S.art.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([c, d]) => `<option value="${esc(c)}">${esc(d || '')}</option>`).join('')}</datalist>
       ${typeof stagioniCon === 'function' ? `<label class="campo">Collezione<select id="st-stag" style="width:auto"></select></label>` : ''}
     </div>
-    <div class="sub" id="st-info" style="margin-top:10px">Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${ST_FASI[T.fase].nome}».</div></div>
+    <div class="sub" id="st-info" style="margin-top:10px">${stIstr(ST_FASI[T.fase])}</div></div>
     <div id="st-corpo"></div>`;
   $('#st-file').addEventListener('change', e => stLeggi(e.target.files[0]));
-  $('#st-fase').addEventListener('change', e => { T.fase = e.target.value; if (T.wb) stDaFoglio(); else stDisegna(); });
+  $('#st-fase').addEventListener('change', e => { T.fase = e.target.value; T.abb = {}; if (T.wb) stDaFoglio(); else stDisegna(); });
   const scegliArt = () => { T.pf = codiceDaArt($('#st-pf').value.trim()).toUpperCase(); T.pfScelto = !!T.pf; T.nonTrovato = ''; stOpzStag(); stCaricaComp(); };
   $('#st-pf').addEventListener('change', scegliArt);
   if ($('#st-stag')) $('#st-stag').addEventListener('change', e => { T.st = e.target.value; stCaricaComp(); });
@@ -2507,8 +2510,48 @@ async function stLeggi(file) {
     stDaFoglio();
   } catch (e) { toast('File non leggibile: ' + e.message, 'err'); }
 }
+function stDaConsumi() { // Consumi: in qualsiasi foglio, la riga con le intestazioni Pezzi / Codice materiale/Pezzo / Esatto
+  const T = S.st; T.righe = []; T.foglio = '';
+  for (const nome of T.wb.SheetNames) {
+    const aoa = XLSX.utils.sheet_to_json(T.wb.Sheets[nome], { header: 1, raw: true, defval: null, blankrows: true, range: 0 });
+    for (let h = 0; h < Math.min(aoa.length, 40); h++) {
+      const r = (aoa[h] || []).map(stNorm), cP = r.indexOf('pezzi'), cC = r.findIndex(v => v.startsWith('codice materiale')), cE = r.findIndex(v => v.startsWith('esatto'));
+      if (cP < 0 || cC < 0 || cE < 0) continue;
+      let mat = '', primo = true;
+      for (let i = h + 1; i < aoa.length; i++) {
+        const x = aoa[i] || [], cod = String(x[cC] ?? '').trim(), n = stNum(x[cP]), es = stNum(x[cE]);
+        if (!cod) { primo = true; continue; } // riga vuota: dopo comincia un altro materiale
+        const isMat = primo && /\d/.test(cod) && /^[a-z0-9][a-z0-9.\/_-]*$/i.test(cod); // prima riga del gruppo con un codice (A003785, 118772): è il materiale
+        primo = false;
+        if (isMat) mat = cod;
+        T.righe.push({ riga: i + 1, comp: cod, n, esatto: es, tot: n === null || es === null ? null : (n ? es / n : null), mat: isMat ? '' : mat, materiale: isMat, gruppo: (isMat ? '' : mat) + '|' + cod }); // =SE($B="";"";$D/$B)
+      }
+      T.foglio = nome; break;
+    }
+    if (T.foglio) break;
+  }
+  if (!T.foglio) toast('Nel file non ho trovato le colonne Pezzi, Codice materiale/Pezzo ed Esatto', 'err');
+  stCaricaComp();
+}
+function stGruppi() { // voci da abbinare (non le righe dei materiali), con i loro valori
+  const T = S.st, out = [], per = new Map();
+  for (const r of T.righe || []) {
+    if (r.materiale) continue;
+    const k = r.gruppo || r.comp;
+    if (!per.has(k)) { per.set(k, { key: k, comp: r.comp, mat: r.mat || '', n: 0, tot: 0, cnt: 0 }); out.push(per.get(k)); }
+    const g = per.get(k); g.n++; if (r.tot !== null) { g.tot += r.tot; g.cnt++; }
+  }
+  if (ST_FASI[T.fase].consumi) for (const g of out) g.tot = g.cnt ? g.tot / g.cnt : 0; // consumi: CNS per pezzo (non si sommano)
+  return out;
+}
+function stNuovi() { // componente → valore nuovo: tempi = somma delle voci; consumi = media delle voci abbinate
+  const T = S.st, cons = ST_FASI[T.fase].consumi, acc = new Map();
+  for (const g of stGruppi()) { const id = Number(T.abb[g.key]); if (!id) continue; const a = acc.get(id) || { s: 0, n: 0 }; a.s += g.tot; a.n++; acc.set(id, a); }
+  return new Map([...acc].map(([id, a]) => [id, { v: cons ? a.s / a.n : a.s, n: a.n }]));
+}
 function stDaFoglio() {
   const T = S.st, F = ST_FASI[T.fase];
+  if (F.consumi) return stDaConsumi();
   const nome = T.wb.SheetNames.find(n => stNorm(n) === F.foglio) || T.wb.SheetNames.find(n => { const ws = T.wb.Sheets[n]; return ws.A1 && new RegExp('scheda di ' + F.foglio, 'i').test(String(ws.A1.v)); });
   if (!nome) { T.righe = []; toast(`Nel file non c'è il foglio «${F.nome}»`, 'err'); return stDisegna(); }
   const aoa = XLSX.utils.sheet_to_json(T.wb.Sheets[nome], { header: 1, raw: true, defval: null, blankrows: true });
@@ -2530,51 +2573,58 @@ async function stCaricaComp() {
   try {
     const [d, m] = await Promise.all([api('/api/admin/componenti', { query: T.st !== undefined && $('#st-stag') ? { pf: T.pf, stagione: T.st || '' } : { pf: T.pf } }), T.mappa ? Promise.resolve({ mappa: T.mappa }) : api('/api/admin/schede-tempi/mappa')]);
     T.mappa = m.mappa || {};
-    T.comp = (d.componenti || []).map(c => ({ id: c.id, nome: String(c.componente || '').replace(T.pf + '-', '').replace(new RegExp('^' + T.pf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*-\\s*'), ''), sec: c[ST_FASI[T.fase].campo], tutti: { sec_taglio: c.sec_taglio, sec_prep: c.sec_prep, sec_rma: c.sec_rma, sec_ting: c.sec_ting } }));
+    T.comp = (d.componenti || []).map(c => ({ id: c.id, nome: String(c.componente || '').replace(T.pf + '-', '').replace(new RegExp('^' + T.pf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*-\\s*'), ''), sec: c[ST_FASI[T.fase].campo], mat: c.codice_materiale || '', tutti: { sec_taglio: c.sec_taglio, sec_prep: c.sec_prep, sec_rma: c.sec_rma, sec_ting: c.sec_ting, cns_area: c.cns_area } }));
     T.abb = {}; stSuggerisci();
   } catch (e) { toast(e.message, 'err'); T.comp = []; }
   stDisegna();
 }
+const stChiaveMappa = g => g.mat ? `${g.mat} · ${g.comp}` : g.comp; // consumi: lo stesso pezzo può stare in materiali diversi
 function stSuggerisci() { // per ogni voce della scheda: abbinamento salvato, stesso nome, o il componente con più parole in comune
-  const T = S.st, gruppi = [...new Set((T.righe || []).map(r => r.comp))];
-  for (const g of gruppi) {
-    if (T.abb[g] !== undefined) continue;
-    const salvato = T.mappa[stNorm(g)], perNome = n => T.comp.find(c => stNorm(c.nome) === stNorm(n));
-    let c = (salvato && perNome(salvato)) || perNome(g);
+  const T = S.st;
+  for (const G of stGruppi()) {
+    const g = G.comp;
+    if (T.abb[G.key] !== undefined) continue;
+    // consumi: se il Database usa gli stessi codici materiale, si propongono solo componenti di quel materiale
+    const M = String(G.mat || '').toUpperCase(), ok = x => !x.mat || String(x.mat).toUpperCase().startsWith(M);
+    const usaMat = !!(ST_FASI[T.fase].consumi && M && T.comp.some(x => x.mat && ok(x))), cand = usaMat ? T.comp.filter(ok) : T.comp;
+    const salvato = T.mappa[stNorm(stChiaveMappa(G))] || (G.mat ? null : T.mappa[stNorm(g)]), perNome = n => cand.find(c => stNorm(c.nome) === stNorm(n));
+    let c = (salvato && T.comp.find(x => stNorm(x.nome) === stNorm(salvato))) || perNome(g);
     if (!c) {
       const pg = stParole(g); let best = null, sc = 0;
-      for (const x of T.comp) { const px = stParole(x.nome), com = pg.filter(w => px.some(y => y === w || (w.length > 3 && (y.startsWith(w) || w.startsWith(y))))).length, s = com / Math.max(pg.length, px.length, 1); if (s > sc) { sc = s; best = x; } }
+      for (const x of cand) { const px = stParole(x.nome), com = pg.filter(w => px.some(y => y === w || (w.length > 3 && (y.startsWith(w) || w.startsWith(y))))).length, s = com / Math.max(pg.length, px.length, 1); if (s > sc) { sc = s; best = x; } }
       if (sc >= 0.34) c = best;
     }
-    T.abb[g] = c ? c.id : '';
+    T.abb[G.key] = c ? c.id : '';
   }
 }
 function stDisegna() {
   const T = S.st, box = $('#st-corpo'); if (!box) return;
   const F = ST_FASI[T.fase]; T.abb = T.abb || {};
-  if ($('#st-info')) $('#st-info').innerHTML = T.wb ? `<b>${esc(T.file)}</b> · foglio «${esc(T.foglio || F.nome)}» · ${fmtN((T.righe || []).length)} righe${T.testa && T.testa.nome ? ` · ${esc(T.testa.nome)}` : ''}${T.testa && T.testa.brand ? ` · ${esc(T.testa.brand)}` : ''}${T.nonTrovato ? ` · <span style="color:var(--rosso)">articolo ${esc(T.nonTrovato)} non trovato nel Database: sceglilo a mano</span>` : ''}` : `Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${F.nome}».`;
+  if ($('#st-info')) $('#st-info').innerHTML = T.wb ? `<b>${esc(T.file)}</b> · foglio «${esc(T.foglio || F.nome)}» · ${fmtN((T.righe || []).length)} righe${T.testa && T.testa.nome ? ` · ${esc(T.testa.nome)}` : ''}${T.testa && T.testa.brand ? ` · ${esc(T.testa.brand)}` : ''}${T.nonTrovato ? ` · <span style="color:var(--rosso)">articolo ${esc(T.nonTrovato)} non trovato nel Database: sceglilo a mano</span>` : ''}` : stIstr(F);
   if (!T.righe) { box.innerHTML = ''; return; }
-  const gruppi = []; const per = new Map();
-  for (const r of T.righe) { if (!per.has(r.comp)) { per.set(r.comp, { comp: r.comp, n: 0, tot: 0 }); gruppi.push(per.get(r.comp)); } const g = per.get(r.comp); g.n++; g.tot += r.tot || 0; }
-  const nuovi = new Map(); for (const g of gruppi) { const id = Number(T.abb[g.comp]); if (id) nuovi.set(id, (nuovi.get(id) || 0) + g.tot); }
-  const totale = T.righe.reduce((s, r) => s + (r.tot || 0), 0);
+  const gruppi = stGruppi(), nv = stNuovi(), D = stDec(), cons = !!F.consumi, um = cons ? '' : ' [s]';
+  const totale = T.righe.reduce((s, r) => s + (r.materiale ? 0 : r.tot || 0), 0);
+  const matDiverso = (g, id) => { const c = cons && g.mat && (T.comp || []).find(x => x.id === Number(id)); return c && c.mat && !String(c.mat).toUpperCase().startsWith(g.mat.toUpperCase()) ? c.mat : ''; };
   const opz = sel => `<option value="">— non usare —</option>${(T.comp || []).map(c => `<option value="${c.id}" ${Number(sel) === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}`;
   box.innerHTML = `<div class="card"><div class="riga-flex"><h3 style="margin:0;flex:1">Abbinamento ai componenti ${T.pf ? `di ${esc(T.pf)}${T.st ? ' · ' + esc(T.st) : ''}` : ''}</h3>
-      <span class="sub">Totale scheda <b>${fmt(totale, 2)}</b> s</span>
+      ${cons ? '' : `<span class="sub">Totale scheda <b>${fmt(totale, 2)}</b> s</span>`}
       <button class="btn" onclick="stEsporta()">⤓ Excel</button>
       <button class="btn prim" onclick="stSalva()" ${T.comp && T.comp.length ? '' : 'disabled'}>Salva nei componenti</button></div>
     ${!T.pf ? '<div class="sub" style="margin-top:8px">Scegli l\'articolo per abbinare le voci ai suoi componenti.</div>' : !(T.comp || []).length ? '<div class="sub" style="margin-top:8px">L\'articolo non ha componenti nel Database.</div>' : ''}
-    <div class="tabwrap" style="margin-top:10px"><table class="foglio"><thead><tr><th>Voce della scheda</th><th>Righe</th><th>Totale [s]</th><th>Componente dell'articolo</th></tr></thead>
-      <tbody>${gruppi.map(g => `<tr${T.abb[g.comp] ? '' : ' class="st-nonusa"'}><td style="text-align:left">${esc(g.comp)}</td><td>${g.n}</td><td><b>${fmt(g.tot, 2)}</b></td>
-        <td><select data-st="${esc(g.comp)}" style="min-width:240px" ${T.abb[g.comp] ? '' : 'title="Voce non abbinata: i suoi secondi non vanno in nessun componente"'}>${opz(T.abb[g.comp])}</select></td></tr>`).join('')}</tbody></table></div>
+    <div class="tabwrap" style="margin-top:10px"><table class="foglio"><thead><tr><th>Voce ${cons ? 'del file' : 'della scheda'}</th>${cons ? '<th>Materiale</th>' : ''}<th>Righe</th><th>${cons ? 'CNS per pezzo' : 'Totale [s]'}</th><th>Componente dell'articolo</th></tr></thead>
+      <tbody>${gruppi.map(g => { const md = matDiverso(g, T.abb[g.key]); return `<tr${T.abb[g.key] ? '' : ' class="st-nonusa"'}><td style="text-align:left">${esc(g.comp)}</td>${cons ? `<td>${esc(g.mat)}</td>` : ''}<td>${g.n}</td><td><b>${fmt(g.tot, D)}</b></td>
+        <td><select data-st="${esc(g.key)}" style="min-width:240px" ${T.abb[g.key] ? '' : `title="Voce non abbinata: ${cons ? 'il suo consumo non va' : 'i suoi secondi non vanno'} in nessun componente"`}>${opz(T.abb[g.key])}</select>${md ? `<div class="sub" style="color:#b06000;margin-top:3px">⚠ nel Database il componente ha il materiale ${esc(md)}</div>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
     ${(T.comp || []).length ? `<h3 style="margin:16px 0 8px">${F.col} dei componenti</h3>
-    <div class="tabwrap"><table class="foglio"><thead><tr><th>Componente</th><th>Attuale [s]</th><th>Nuovo [s]</th><th>Differenza</th></tr></thead>
-      <tbody>${T.comp.map(c => { const nv = nuovi.get(c.id), att = stNum(c.sec); return `<tr${nv !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : fmt(att, 2)}</td>
-        <td>${nv !== undefined ? `<b>${fmt(nv, 2)}</b>` : 'resta com\'è'}</td><td>${nv !== undefined && att !== null ? `<span style="color:${nv - att > 0.004 ? '#d00000' : nv - att < -0.004 ? '#1e9e4a' : '#999'}">${nv - att > 0 ? '+' : ''}${fmt(nv - att, 2)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
-    ${stHtmlBc()}
-    <details style="margin-top:14px"><summary class="sub" style="cursor:pointer">Righe lette dal foglio (A, I, J, K) e Totale calcolato</summary>
-      <div class="tabwrap" style="margin-top:8px;max-height:420px"><table class="foglio"><thead><tr><th>Riga</th><th>Componente</th><th>N°Componenti</th><th>Coeff. [s]</th><th>TC [s]</th><th>Totale</th></tr></thead>
-        <tbody>${T.righe.map(r => `<tr><td class="sub">${r.riga}</td><td style="text-align:left">${esc(r.comp)}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td>${esc(r.coeff ?? '')}</td><td>${r.tc === null ? '' : fmtN(r.tc)}</td><td><b>${r.tot === null ? '' : fmt(r.tot, 2)}</b></td></tr>`).join('')}</tbody></table></div></details></div>`;
+    <div class="tabwrap"><table class="foglio"><thead><tr><th>Componente</th><th>Attuale${um}</th><th>Nuovo${um}</th><th>Differenza</th></tr></thead>
+      <tbody>${T.comp.map(c => { const x = nv.get(c.id), nuovo = x ? x.v : undefined, att = stNum(c.sec), eps = cons ? 0.00005 : 0.004; return `<tr${nuovo !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : fmt(att, D)}</td>
+        <td>${nuovo !== undefined ? `<b>${fmt(nuovo, D)}</b>${cons && x.n > 1 ? ` <small class="sub">(media di ${x.n} voci)</small>` : ''}` : 'resta com\'è'}</td><td>${nuovo !== undefined && att !== null ? `<span style="color:${nuovo - att > eps ? '#d00000' : nuovo - att < -eps ? '#1e9e4a' : '#999'}">${nuovo - att > 0 ? '+' : ''}${fmt(nuovo - att, D)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    ${cons ? '' : stHtmlBc()}
+    <details style="margin-top:14px"><summary class="sub" style="cursor:pointer">Righe lette ${cons ? '(Pezzi, Codice materiale/Pezzo, Esatto) e CNS calcolato' : 'dal foglio (A, I, J, K) e Totale calcolato'}</summary>
+      <div class="tabwrap" style="margin-top:8px;max-height:420px"><table class="foglio">${cons
+        ? `<thead><tr><th>Riga</th><th>Pezzi</th><th>Codice materiale/Pezzo</th><th>Esatto</th><th>CNS per pezzo</th></tr></thead>
+        <tbody>${T.righe.map(r => `<tr${r.materiale ? ' style="font-weight:700;background:#f4f4f4"' : ''}><td class="sub">${r.riga}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td style="text-align:left">${esc(r.comp)}${r.materiale ? ' <small class="sub">materiale</small>' : ''}</td><td>${r.esatto === null ? '' : fmt(r.esatto, 4)}</td><td>${r.materiale || r.tot === null ? '' : `<b>${fmt(r.tot, 4)}</b>`}</td></tr>`).join('')}</tbody>`
+        : `<thead><tr><th>Riga</th><th>Componente</th><th>N°Componenti</th><th>Coeff. [s]</th><th>TC [s]</th><th>Totale</th></tr></thead>
+        <tbody>${T.righe.map(r => `<tr><td class="sub">${r.riga}</td><td style="text-align:left">${esc(r.comp)}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td>${esc(r.coeff ?? '')}</td><td>${r.tc === null ? '' : fmtN(r.tc)}</td><td><b>${r.tot === null ? '' : fmt(r.tot, 2)}</b></td></tr>`).join('')}</tbody>`}</table></div></details></div>`;
   $$('#st-corpo select[data-st]').forEach(s => s.addEventListener('change', e => { T.abb[e.target.dataset.st] = e.target.value; stDisegna(); }));
 }
 const stBcComp = () => (S.st.comp || []).find(c => stNorm(c.nome) === 'borse complete');
@@ -2598,18 +2648,22 @@ async function stSalvaBc() {
   catch (e) { toast(e.message, 'err'); }
 }
 async function stSalva() {
-  const T = S.st, F = ST_FASI[T.fase], nuovi = new Map();
-  for (const r of T.righe) { const id = Number(T.abb[r.comp]); if (id) nuovi.set(id, (nuovi.get(id) || 0) + (r.tot || 0)); }
+  const T = S.st, F = ST_FASI[T.fase], nuovi = new Map([...stNuovi()].map(([id, x]) => [id, x.v]));
   if (!nuovi.size) return toast('Nessuna voce abbinata a un componente', 'err');
   if (!confirm(`Scrivo ${F.col} in ${nuovi.size} componenti di ${T.pf}${T.st ? ' (' + T.st + ')' : ''}.\nI componenti non abbinati restano come sono.`)) return;
-  const mappa = {}; for (const [g, id] of Object.entries(T.abb)) { const c = T.comp.find(x => x.id === Number(id)); mappa[g] = c ? c.nome : ''; }
+  const mappa = {}; for (const g of stGruppi()) { const c = T.comp.find(x => x.id === Number(T.abb[g.key])); mappa[stChiaveMappa(g)] = c ? c.nome : ''; } // si ricordano per nome della voce (e materiale, nei consumi)
   try {
     const r = await api('/api/admin/schede-tempi/applica', { method: 'POST', body: { campo: F.campo, valori: [...nuovi].map(([id, sec]) => ({ id, sec })), mappa } });
     T.mappa = null; toast(`${F.col} aggiornati in ${r.aggiornati} componenti`, 'ok'); stCaricaComp();
   } catch (e) { toast(e.message, 'err'); }
 }
-function stEsporta() { // come il foglio «Scheda tempi»: Componente, N°Componenti, Coeff. [s], TC [s], Totale
+function stEsporta() { // come i fogli «Scheda tempi» e «Consumi» del file delle formule
   const T = S.st, F = ST_FASI[T.fase];
+  if (F.consumi) {
+    const aoa = [['', 'Pezzi', 'Codice materiale/Pezzo', 'Esatto', '', 'CNS per pezzo'], ...T.righe.map(r => ['', r.n, r.comp, r.esatto, '', r.materiale || r.tot === null ? '' : Math.round(r.tot * 1e6) / 1e6])];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Consumi');
+    return XLSX.writeFile(wb, `Consumi ${T.pf || ''}.xlsx`.replace(/\s+/g, ' '));
+  }
   const aoa = [[`Scheda di ${F.nome}`], [T.testa && T.testa.codice || T.file || ''], [], ['Componente', 'N°Componenti', 'Coeff. [s]', 'TC [s]', 'Totale'], ...T.righe.map(r => [r.comp, r.n, r.coeff, r.tc, r.tot === null ? '' : Math.round(r.tot * 1000) / 1000])];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Scheda tempi');
   XLSX.writeFile(wb, `Scheda tempi ${F.nome} ${T.pf || ''}.xlsx`.replace(/\s+/g, ' '));
