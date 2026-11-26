@@ -2452,7 +2452,7 @@ function cambiaTabDb(k) {
    di ogni componente va nei suoi secondi della fase. --- */
 const ST_FASI = { prep: { foglio: 'preparazione', campo: 'sec_prep', nome: 'Preparazione', col: 'Sec. prep.' }, taglio: { foglio: 'taglio', campo: 'sec_taglio', nome: 'Taglio', col: 'Sec. taglio' },
   cns: { consumi: true, campo: 'cns_area', nome: 'Consumi', col: 'CNS area' } }; // Consumi: colonne Pezzi, Codice materiale/Pezzo, Esatto → CNS = Esatto ÷ Pezzi
-const stIstr = F => F.consumi ? 'Carica il file dei consumi: si leggono le colonne Pezzi, Codice materiale/Pezzo ed Esatto e si calcola CNS = Esatto ÷ Pezzi.' : `Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${F.nome}».`;
+const stIstr = F => F.consumi ? 'Carica il file dei consumi: dal foglio «Materiali e componenti» si leggono le colonne Pezzi, Codice materiale/Pezzo ed Esatto e si calcola CNS = Esatto ÷ Pezzi.' : `Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${F.nome}».`;
 const stDec = () => ST_FASI[S.st.fase].consumi ? 4 : 2; // CNS con 4 decimali, secondi con 2
 const ST_BC = [{ rep: 'taglio', campo: 'sec_taglio', nome: 'Taglio' }, { rep: 'preparazione', campo: 'sec_prep', nome: 'Preparazione' }, { rep: 'rma', campo: 'sec_rma', nome: 'RMA' }, { rep: 'prima tingitura', campo: 'sec_ting', nome: 'Prima tingitura' }];
 const stNorm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -2510,27 +2510,37 @@ async function stLeggi(file) {
     stDaFoglio();
   } catch (e) { toast('File non leggibile: ' + e.message, 'err'); }
 }
-function stDaConsumi() { // Consumi: in qualsiasi foglio, la riga con le intestazioni Pezzi / Codice materiale/Pezzo / Esatto
+const stFoglioConsumi = n => /^materiali e compon/.test(stNorm(n).replace(/&/g, ' e ').replace(/\s+/g, ' ')); // il foglio «Materiali e componenti»
+function stDaConsumi() { // Consumi: foglio «Materiali e componenti», colonne Pezzi / Codice materiale/Pezzo / Esatto
   const T = S.st; T.righe = []; T.foglio = '';
-  for (const nome of T.wb.SheetNames) {
-    const aoa = XLSX.utils.sheet_to_json(T.wb.Sheets[nome], { header: 1, raw: true, defval: null, blankrows: true, range: 0 });
-    for (let h = 0; h < Math.min(aoa.length, 40); h++) {
-      const r = (aoa[h] || []).map(stNorm), cP = r.indexOf('pezzi'), cC = r.findIndex(v => v.startsWith('codice materiale')), cE = r.findIndex(v => v.startsWith('esatto'));
+  const leggi = (aoa, h, cP, cC, cE) => {
+    let mat = '', primo = true;
+    for (let i = h + 1; i < aoa.length; i++) {
+      const x = aoa[i] || [], cod = String(x[cC] ?? '').trim(), n = stNum(x[cP]), es = stNum(x[cE]);
+      if (!cod) { primo = true; continue; } // riga vuota: dopo comincia un altro materiale
+      const isMat = primo && /\d/.test(cod) && /^[a-z0-9][a-z0-9.\/_-]*$/i.test(cod); // prima riga del gruppo con un codice (A003785, 118772): è il materiale
+      primo = false;
+      if (isMat) mat = cod;
+      T.righe.push({ riga: i + 1, comp: cod, n, esatto: es, tot: n === null || es === null ? null : (n ? es / n : null), mat: isMat ? '' : mat, materiale: isMat, gruppo: (isMat ? '' : mat) + '|' + cod }); // =SE($B="";"";$D/$B)
+    }
+  };
+  const fogli = [...T.wb.SheetNames].sort((a, b) => stFoglioConsumi(b) - stFoglioConsumi(a)); // prima «Materiali e componenti», poi gli altri
+  const aoaDi = nome => { const ws = T.wb.Sheets[nome]; if (!ws['!ref']) return []; const rg = XLSX.utils.decode_range(ws['!ref']); rg.s = { r: 0, c: 0 }; // sempre da A1: colonne e righe come in Excel
+    return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true, range: rg }); };
+  for (const nome of fogli) {
+    const aoa = aoaDi(nome);
+    for (let h = 0; h < Math.min(aoa.length, 60); h++) {
+      const r = (aoa[h] || []).map(stNorm), cP = r.findIndex(v => /\bpezzi\b/.test(v)), cC = r.findIndex(v => v.startsWith('codice materiale')), cE = r.findIndex(v => v.includes('esatto'));
       if (cP < 0 || cC < 0 || cE < 0) continue;
-      let mat = '', primo = true;
-      for (let i = h + 1; i < aoa.length; i++) {
-        const x = aoa[i] || [], cod = String(x[cC] ?? '').trim(), n = stNum(x[cP]), es = stNum(x[cE]);
-        if (!cod) { primo = true; continue; } // riga vuota: dopo comincia un altro materiale
-        const isMat = primo && /\d/.test(cod) && /^[a-z0-9][a-z0-9.\/_-]*$/i.test(cod); // prima riga del gruppo con un codice (A003785, 118772): è il materiale
-        primo = false;
-        if (isMat) mat = cod;
-        T.righe.push({ riga: i + 1, comp: cod, n, esatto: es, tot: n === null || es === null ? null : (n ? es / n : null), mat: isMat ? '' : mat, materiale: isMat, gruppo: (isMat ? '' : mat) + '|' + cod }); // =SE($B="";"";$D/$B)
-      }
-      T.foglio = nome; break;
+      leggi(aoa, h, cP, cC, cE); T.foglio = nome; break;
     }
     if (T.foglio) break;
   }
-  if (!T.foglio) toast('Nel file non ho trovato le colonne Pezzi, Codice materiale/Pezzo ed Esatto', 'err');
+  if (!T.foglio) { // intestazioni non trovate: nel foglio «Materiali e componenti» si usano le colonne del file delle formule (B Pezzi, C Codice, D Esatto)
+    const nome = T.wb.SheetNames.find(stFoglioConsumi);
+    if (nome) { leggi(aoaDi(nome), 0, 1, 2, 3); T.foglio = nome; toast('Intestazioni non trovate: letti Pezzi in B, Codice in C, Esatto in D', 'err'); }
+  }
+  if (!T.foglio) toast('Nel file non c\'è il foglio «Materiali e componenti» con le colonne Pezzi, Codice materiale/Pezzo ed Esatto', 'err');
   stCaricaComp();
 }
 function stGruppi() { // voci da abbinare (non le righe dei materiali), con i loro valori
