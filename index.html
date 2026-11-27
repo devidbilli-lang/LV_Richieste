@@ -331,7 +331,7 @@ body.con-pannello main{padding-bottom:52vh}
 
 .sotto-tab{display:flex;gap:6px;flex-wrap:wrap}
 .db-testa{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:8px}
-#an-extra{margin-left:auto;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#an-extra{flex-basis:100%;margin-left:0;gap:6px;flex-wrap:wrap;justify-content:flex-start} /* tutto a sinistra */
 #an-extra input{padding:6px 10px;font-size:13px}
 #an-extra .btn{padding:6px 12px;font-size:13px}
 #an-extra .pillole button{padding:5px 11px;font-size:12.5px}
@@ -2745,13 +2745,18 @@ function vistaAnagrafiche() {
     <div id="an-extra" class="riga-flex"></div></div><div id="an-corpo"></div>`;
   if (t === 'componenti') return vistaComponentiDb();
   if (t === 'schede_tempi') { $('#an-corpo').innerHTML = ''; return vistaSchedeTempi(); }
-  $('#an-extra').innerHTML = `<span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button>
-      <span class="sub" id="an-info"></span>
-      <button class="btn" onclick="caricaAna(Math.max(0, Math.floor(((S.filtri.anaTot || 1) - 1) / 200) * 200), { fine: true })" title="Vai all'ultima riga della tabella">⇣ Ultima riga</button>
+  // ordine: 1 ricerca · 2 articolo per importare la distinta · 3 tipologia · 4 ultima riga
+  $('#an-extra').innerHTML = `<input id="an-q" placeholder="Cerca…" value="${esc(S.filtri.anaQ || '')}" style="width:200px"><button class="btn" onclick="caricaAna()">Cerca</button>
       ${t === 'distinta' ? `<input id="an-pf" list="dl-art-db" placeholder="Articolo: Codice PF o descrizione…" value="${esc(S.filtri.dibaPf || '')}" style="width:260px" autocomplete="off">
         <datalist id="dl-art-db">${[...S.art.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([c, d]) => `<option value="${esc(c + ' — ' + (d || ''))}">`).join('')}</datalist>
         <button class="btn prim" onclick="apriImportDiba()">Importa da Excel</button>` : ''}
-      <input id="an-q" placeholder="Cerca…" value="${esc(S.filtri.anaQ || '')}" style="width:200px"><button class="btn" onclick="caricaAna()">Cerca</button>`;
+      ${t === 'distinta' ? `<select id="an-tipo" class="filtro-sel" title="Tipologia">${[['', 'Tutte le tipologie']].concat([['MATERIALE#*', 'Tutti i MATERIALE#'], ['FODERA*', 'Tutte le FODERE'], ['INFUSTITURA#*', 'Tutte le INFUSTITURE'], ['ACCESSORIO#*', 'Tutti gli ACCESSORI'], ['Borse Complete', 'Borse Complete']]).map(([v, l]) => `<option value="${esc(v)}" ${(S.filtri.dibaTipo || '') === v ? 'selected' : ''}>${l}</option>`).join('')}
+        <optgroup label="Una tipologia">${TIPOLOGIE_BASE.filter(x => x !== 'Borse Complete').map(x => `<option value="${esc(x)}" ${(S.filtri.dibaTipo || '') === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</optgroup></select>` : ''}
+      
+      <button class="btn" onclick="caricaAna(Math.max(0, Math.floor(((S.filtri.anaTot || 1) - 1) / 200) * 200), { fine: true })" title="Vai all'ultima riga della tabella">⇣ Ultima riga</button>
+      <span class="sub" id="an-info"></span>
+      <span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button>`;
+  if ($('#an-tipo')) $('#an-tipo').addEventListener('change', e => { S.filtri.dibaTipo = e.target.value; caricaAna(); });
   $('#an-corpo').innerHTML = `<div id="an-imp"></div><div id="an-tab"></div>`;
   S.selAna = new Set();
   fabDb(`Aggiungi a ${TAB[t].t}`, () => editAna(null));
@@ -3376,7 +3381,7 @@ async function caricaAna(offset = 0, opz = {}) {
   S.filtri.anaQ = $('#an-q').value.trim();
   const w0 = $('#an-tab .tabwrap'), pos = opz.mantieni && w0 ? { t: w0.scrollTop, l: w0.scrollLeft, y: window.scrollY } : null; // dopo un salvataggio si resta dove si stava lavorando
   try {
-    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '' } });
+    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '', tipo: t === 'distinta' ? (S.filtri.dibaTipo || '') : '' } });
     if (!$('#an-tab')) return;
     if (opz.fine && offset + r.righe.length < r.totale) return caricaAna(Math.floor((r.totale - 1) / 200) * 200, opz); // nel frattempo sono arrivate altre righe
     if (opz.fine && r.righe.length) opz.evidenzia = r.righe[r.righe.length - 1].id; // l'ultima riga di tutta la tabella
