@@ -2979,7 +2979,9 @@ async function caricaTuttiCe(daCache) {
   if ($('#ce-elenco')) $('#ce-elenco').innerHTML = '<p class="sub" style="margin:6px 4px">Carico i componenti…</p>';
   try {
     const righe = (await api('/api/admin/componenti/tutti')).righe, padri = new Set(righe.map(c => c.padre).filter(Boolean));
-    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c, !c.padre && padri.has(c.chiave)), princ: !c.padre })); // padre = chiave del principale // princ: componente principale (riga viola), con o senza rinforzi
+    // principale senza materiale e CNS solo se tra i rinforzi c'è un pezzo di materiale (Sopra/Sotto…): con sole infustiture/accessori il materiale resta suo
+    const conMat = new Set(righe.filter(c => c.padre && !/INFUSTITURA|ACCESSORIO/i.test(c.n_materiale || '') && !['Infustitura', 'Accessorio'].includes(c.tm)).map(c => c.padre));
+    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c, !c.padre && conMat.has(c.chiave)), princ: !c.padre })); // padre = chiave del principale // princ: componente principale (riga viola), con o senza rinforzi
     disegnaTuttiCe(); ripristinaTuttiCe();
   }
   catch (e) { toast(e.message, 'err'); }
