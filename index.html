@@ -2750,13 +2750,18 @@ function vistaAnagrafiche() {
       ${t === 'distinta' ? `<input id="an-pf" list="dl-art-db" placeholder="Articolo: Codice PF o descrizione…" value="${esc(S.filtri.dibaPf || '')}" style="width:260px" autocomplete="off">
         <datalist id="dl-art-db">${[...S.art.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([c, d]) => `<option value="${esc(c + ' — ' + (d || ''))}">`).join('')}</datalist>
         <button class="btn prim" onclick="apriImportDiba()">Importa da Excel</button>` : ''}
-      ${t === 'distinta' ? `<select id="an-tipo" class="filtro-sel" title="Tipologia">${[['', 'Tutte le tipologie']].concat([['MATERIALE#*', 'Tutti i MATERIALE#'], ['FODERA*', 'Tutte le FODERE'], ['INFUSTITURA#*', 'Tutte le INFUSTITURE'], ['ACCESSORIO#*', 'Tutti gli ACCESSORI'], ['Borse Complete', 'Borse Complete']]).map(([v, l]) => `<option value="${esc(v)}" ${(S.filtri.dibaTipo || '') === v ? 'selected' : ''}>${l}</option>`).join('')}
-        <optgroup label="Una tipologia">${TIPOLOGIE_BASE.filter(x => x !== 'Borse Complete').map(x => `<option value="${esc(x)}" ${(S.filtri.dibaTipo || '') === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</optgroup></select>` : ''}
+      ${t === 'distinta' ? `<input id="an-tipo" list="dl-tipo-db" placeholder="Tipologia…" title="Scrivi la tipologia (es. MATERIALE, INFUST, FODERA) o sceglila dall'elenco" value="${esc(S.filtri.dibaTipo || '')}" style="width:170px" autocomplete="off">
+        <datalist id="dl-tipo-db">${['MATERIALE#', 'FODERA', 'INFUSTITURA#', 'ACCESSORIO#', ...TIPOLOGIE_BASE].map(x => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}
       
       <button class="btn" onclick="caricaAna(Math.max(0, Math.floor(((S.filtri.anaTot || 1) - 1) / 200) * 200), { fine: true })" title="Vai all'ultima riga della tabella">⇣ Ultima riga</button>
       <span class="sub" id="an-info"></span>
       <span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button>`;
-  if ($('#an-tipo')) $('#an-tipo').addEventListener('change', e => { S.filtri.dibaTipo = e.target.value; caricaAna(); });
+  if ($('#an-tipo')) { // Tipologia: si scrive (o si sceglie); cerca le tipologie che iniziano così, quella esatta se è una tipologia intera
+    let tt; const vai = () => { clearTimeout(tt); const v = $('#an-tipo').value.trim(); if (v === (S.filtri.dibaTipo || '')) return; S.filtri.dibaTipo = v; caricaAna(); };
+    $('#an-tipo').addEventListener('input', () => { clearTimeout(tt); tt = setTimeout(vai, 400); });
+    $('#an-tipo').addEventListener('change', vai);
+    $('#an-tipo').addEventListener('keydown', e => { if (e.key === 'Enter') vai(); });
+  }
   $('#an-corpo').innerHTML = `<div id="an-imp"></div><div id="an-tab"></div>`;
   S.selAna = new Set();
   fabDb(`Aggiungi a ${TAB[t].t}`, () => editAna(null));
@@ -3376,12 +3381,14 @@ async function salvaCe() { // (la tabella "Tutti i componenti" si ricarica quand
   } catch (e) { toast(e.message, 'err'); $('#ce-salva').disabled = false; }
 }
 
+const tipoDiba = v => { v = String(v || '').trim(); if (!v) return ''; // tipologia intera → quella esatta; altrimenti tutte quelle che iniziano così
+  return TIPOLOGIE_BASE.some(x => x.toUpperCase() === v.toUpperCase()) ? v : v.replace(/\*+$/, '') + '*'; };
 async function caricaAna(offset = 0, opz = {}) {
   const t = S.filtri.anaTab || 'componenti';
   S.filtri.anaQ = $('#an-q').value.trim();
   const w0 = $('#an-tab .tabwrap'), pos = opz.mantieni && w0 ? { t: w0.scrollTop, l: w0.scrollLeft, y: window.scrollY } : null; // dopo un salvataggio si resta dove si stava lavorando
   try {
-    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '', tipo: t === 'distinta' ? (S.filtri.dibaTipo || '') : '' } });
+    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '', tipo: t === 'distinta' ? tipoDiba(S.filtri.dibaTipo) : '' } });
     if (!$('#an-tab')) return;
     if (opz.fine && offset + r.righe.length < r.totale) return caricaAna(Math.floor((r.totale - 1) / 200) * 200, opz); // nel frattempo sono arrivate altre righe
     if (opz.fine && r.righe.length) opz.evidenzia = r.righe[r.righe.length - 1].id; // l'ultima riga di tutta la tabella
