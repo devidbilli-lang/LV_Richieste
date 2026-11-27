@@ -203,8 +203,6 @@ tr.riga-nuova .replica,.tab-ce .replica{display:none!important} /* righe nuove e
 tr.riga-nuova td:hover .replica,tr.riga-nuova td:focus-within .replica{display:block}
 @media (hover:none){tr.riga-nuova td:focus-within .replica{display:block;width:26px;height:26px;line-height:22px}}
 .badge-nuova{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:2px 5px;font-size:10px;font-weight:700;letter-spacing:.02em}
-body.con-nuove .fab{bottom:96px}
-body.con-nuove #toast{bottom:96px}
 .filtri{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .filtro-sel{width:auto;border:3px solid var(--ciano);border-radius:999px;padding:6px 12px;font-size:13px;background:#fff}
 .filtro-sel.att{background:#fb8a3c;color:#fff;border-color:#fb8a3c}
@@ -958,6 +956,7 @@ function vistaFoglio() {
       <div class="spazio" style="flex:1"></div>
       ${isAdmin() ? `<button class="icona" onclick="ricalcolaCnsRighe()" title="Rifà la parte materiale del Totale € (CNS area, TDP ed €) con i dati attuali del Database. I minuti restano quelli registrati.">↻ Ricalcola CNS</button>` : ''}
       <button class="icona" onclick="esportaRighe()" title="Esporta CSV">⤓ CSV</button>
+      <span id="bn-box" style="margin-left:auto"></span>
     </div>
     ${testataFoglio()}
     <div id="r-tab"></div>
@@ -1486,8 +1485,8 @@ function scorrimentoOrizzontale(tb, wrap, celle) {
 function aggiornaBarraNuove() {
   const b = $('#barra-nuove'); if (!b) return;
   const inc = S.nuove.filter(n => mancanti(n).length).length;
-  $('#bn-testo').innerHTML = `<b>${S.nuove.length}</b> ${S.nuove.length === 1 ? 'riga nuova' : 'righe nuove'} · ${inc ? `<span style="color:var(--rosso)">${inc} da completare</span>` : 'tutte compilate'}
-    <span class="sub"> · obbligatori: SKU, componente, data, Pz KO, motivazione</span>`;
+  $('#bn-testo').innerHTML = `<b>${S.nuove.length}</b> ${S.nuove.length === 1 ? 'nuova' : 'nuove'} · ${inc ? `<span style="color:var(--rosso)">${inc} da completare</span>` : 'tutte compilate'}`;
+  $('#bn-testo').title = 'Obbligatori: SKU, componente, data, Pz KO, motivazione'; // testo corto su una riga: la barra in alto non cambia altezza
   $('#bn-salva').textContent = `Salva ${S.nuove.length === 1 ? 'la riga' : S.nuove.length + ' righe'}`;
 }
 function segnaMancanti() { // evidenzia i campi da compilare; restituisce le righe incomplete
@@ -1560,9 +1559,11 @@ function disegnaRighe() {
     <tbody>${vuota ? `<tr><td colspan="${cols.length + 1}" class="vuoto">${puoAggiungere() ? 'Nessuna riga in questo periodo. Premi <b>+</b> per aggiungerne una.' : 'Nessuna riga. Scegli una scheda per aggiungere righe.'}</td></tr>`
       : (f.dir === 'asc' ? corpo + segnaposto + spazio : spazio + segnaposto + corpo)}</tbody></table></div>
     ${righe.length < t.n ? `<div style="text-align:center;margin:12px"><button class="btn" onclick="cercaRighe(true)">Carica altre ${fmtN(Math.min(500, t.n - righe.length))}</button></div>` : ''}
-    ${nuova ? `<div class="barra-salva no-print" id="barra-nuove"><span id="bn-testo"></span><div class="spazio" style="flex:1"></div>
-      <button class="btn" onclick="annullaNuove()">Annulla</button><button class="btn prim" id="bn-salva" onclick="salvaNuove()">Salva</button></div>` : ''}`;
+`;
   document.body.classList.toggle('con-nuove', nuova);
+  const bnb = $('#bn-box'); // righe nuove: Annulla/Salva in alto a destra, nella barra dei filtri (niente barra bianca in fondo)
+  if (bnb) bnb.innerHTML = nuova ? `<span class="riga-flex no-print" id="barra-nuove" style="gap:8px;flex-wrap:nowrap"><span id="bn-testo" class="sub" style="white-space:nowrap"></span>
+      <button class="btn" onclick="annullaNuove()">Annulla</button><button class="btn prim" id="bn-salva" onclick="salvaNuove()">Salva</button></span>` : '';
   if ($('#r-scheda')) $('#r-scheda').disabled = nuova; // le righe nuove appartengono alla scheda scelta
   eventiNuove(); aggiornaBarraNuove();
   if (S.form && S.form.cont === '#pannello') { anteprima(); adattaTabella(); }
@@ -3759,7 +3760,8 @@ function adattaTabelle() {
   const w = vis[0], r = w.getBoundingClientRect(), su = r.top + window.scrollY;
   const dopo = Math.max(0, document.documentElement.scrollHeight - (r.bottom + window.scrollY)); // quello che c'è sotto la tabella (barra Salva…)
   const h = Math.max(260, Math.floor(window.innerHeight - su - Math.min(dopo, 120) - 8));
-  if (w.style.maxHeight !== h + 'px') { w.style.maxHeight = h + 'px'; w.dataset.adatta = '1'; }
+  const ora = parseFloat(w.style.maxHeight) || 0;
+  if (!ora || Math.abs(ora - h) > 20) { w.style.maxHeight = h + 'px'; w.dataset.adatta = '1'; } // piccoli cambi sotto la tabella: non si muove
 }
 const chiediAdatta = () => { if (!adattaRaf) adattaRaf = requestAnimationFrame(adattaTabelle); };
 window.addEventListener('resize', chiediAdatta);
