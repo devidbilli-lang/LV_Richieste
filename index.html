@@ -512,6 +512,22 @@ tr.sel td{background:#fff4d6!important}
 #r-tab tr.riga-nuova td[data-k="sku"] input:focus{outline:none;transform:scale(1.04);box-shadow:0 0 0 3px rgba(251,138,60,.4),0 3px 6px rgba(0,0,0,.2),inset 0 2px 2px rgba(255,255,255,.9)}
 .av-date{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--tenue);white-space:nowrap} /* Avanzamento: date nella barra dei filtri */
 .av-date input.filtro-sel{padding:5px 10px}
+/* Database › Componenti: colonne dei secondi colorate per reparto */
+table.foglio th.rep{color:#fff!important;font-weight:700!important;font-style:normal;letter-spacing:.2px}
+table.foglio th.rep-taglio{background:#2f80ed!important;border-bottom-color:#1c5fc0!important}
+table.foglio th.rep-prep{background:#27ae60!important;border-bottom-color:#1b7a43!important}
+table.foglio th.rep-ting{background:#9b51e0!important;border-bottom-color:#6a2bb0!important}
+table.foglio th.rep-rma{background:#f2994a!important;border-bottom-color:#c56a1c!important}
+.tab-ce td.rep-taglio input{background:#e8f1fe;border-color:#9cc3f7;color:#0b4fa8;font-weight:700}
+.tab-ce td.rep-prep input{background:#e6f7ec;border-color:#8fd3a8;color:#1b7a43;font-weight:700}
+.tab-ce td.rep-ting input{background:#f3eafd;border-color:#c9a6f2;color:#6a2bb0;font-weight:700}
+.tab-ce td.rep-rma input{background:#fff1e5;border-color:#f5c08f;color:#b35a0c;font-weight:700}
+table.tab-tutti td.rep{font-weight:700}
+table.tab-tutti tr:not(.tt-princ) td.rep-taglio:not(.c-manca){background:#e8f1fe!important;color:#0b4fa8}
+table.tab-tutti tr:not(.tt-princ) td.rep-prep:not(.c-manca){background:#e6f7ec!important;color:#1b7a43}
+table.tab-tutti tr:not(.tt-princ) td.rep-ting:not(.c-manca){background:#f3eafd!important;color:#6a2bb0}
+table.tab-tutti tr:not(.tt-princ) td.rep-rma:not(.c-manca){background:#fff1e5!important;color:#b35a0c}
+table.tab-tutti tr.tt-princ td.rep-taglio{color:#0b4fa8}table.tab-tutti tr.tt-princ td.rep-prep{color:#1b7a43}table.tab-tutti tr.tt-princ td.rep-ting{color:#6a2bb0}table.tab-tutti tr.tt-princ td.rep-rma{color:#b35a0c}
 </style>
 </head>
 <body>
@@ -2997,6 +3013,7 @@ const TC_COL = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz', 'n'], ['cns_ar
 const CALCOLATI = new Set(['codice_materiale', 'descr_materiale', 'prezzo', 'tdp', 'um', 'tm']);
 const DERIVATI = { codice_materiale: 'manca in Distinta base per la tipologia', prezzo: 'manca in Items BC', tdp: 'manca nella tabella TDP' };
 const vuoto = v => v === null || v === undefined || String(v).trim() === '';
+const REP_SEC = { sec_taglio: 'taglio', sec_prep: 'prep', sec_ting: 'ting', sec_rma: 'rma' }; // secondi dei reparti: un colore per reparto
 // sotto-componenti: ★ quelli in pelle con MATERIALE#, ↳ gli altri (infustiture, accessori…)
 const eMatRinf = c => /MATERIALE#/i.test((c && (c.n_materiale || c.tipo)) || '');
 const segnoRinf = c => eMatRinf(c) ? '<span class="stella-rinf" title="Sotto-componente in pelle (MATERIALE#)">★</span>' : '<span class="freccia-rinf">↳</span>';
@@ -3083,12 +3100,12 @@ function disegnaTuttiCe() {
   const rigaTt = (c, i) => `${i && c.codice_pf !== pagina[i - 1].codice_pf ? `<tr class="tt-sep"><td colspan="${TC_COL.length + 4}"></td></tr>` : ''}<tr class="clic ${c.padre ? 'tt-rinf' : c.princ ? 'tt-princ' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
         <td class="c-art"><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
         <td class="c-comp">${c.padre ? segnoRinf(c) : ''}${nome(c)}</td><td class="sub c-comp">${c.padre ? esc(String(c.padre).replace(c.codice_pf + '-', '')) : ''}</td>
-        ${TC_COL.map(([k, , tipo]) => `<td class="${CALCOLATI.has(k) ? 'c-ro ' : ''}${tipo ? 'c-cifra ' : ''}${k === 'descr_materiale' ? 'c-descr ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${k === 'descr_materiale' && c[k] ? `title="${esc(c[k])}"` : ''}${DERIVATI[k] && c.manca.includes(k) ? ` title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
+        ${TC_COL.map(([k, , tipo]) => `<td class="${REP_SEC[k] ? 'rep rep-' + REP_SEC[k] + ' ' : ''}${CALCOLATI.has(k) ? 'c-ro ' : ''}${tipo ? 'c-cifra ' : ''}${k === 'descr_materiale' ? 'c-descr ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${k === 'descr_materiale' && c[k] ? `title="${esc(c[k])}"` : ''}${DERIVATI[k] && c.manca.includes(k) ? ` title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
         <td>${c.manca.length ? `<span class="badge-manca" title="${c.manca.length} campi da completare">${c.manca.length} da compl.</span>` : '<span class="ok-txt">✓</span>'}</td></tr>`;
   const righeTt = (da, a) => pagina.slice(da, a).map((c, j) => rigaTt(c, da + j)).join('');
   t.lista = pagina; t.inizio = 0; t.mostrate = Math.min(pagina.length, Math.max(PASSO_TT, t.minMostra || 0)); t.minMostra = 0;
   box.innerHTML = `
-    <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([k, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}${CALCOLATI.has(k) ? ' c-ro' : ''}"${CALCOLATI.has(k) ? ' title="Si aggiorna da solo: non si compila a mano"' : ''}>${l}</th>`).join('')}<th>Stato</th></tr></thead>
+    <div class="tabwrap tab-alta"><table class="foglio tab-tutti"><thead><tr><th>Articolo</th><th>Componente</th><th>Rinforzo di</th>${TC_COL.map(([k, l, tipo]) => `<th class="${tipo === 'e' ? 'n' : ''}${CALCOLATI.has(k) ? ' c-ro' : ''}${REP_SEC[k] ? ' rep rep-' + REP_SEC[k] : ''}"${CALCOLATI.has(k) ? ' title="Si aggiorna da solo: non si compila a mano"' : ''}>${l}</th>`).join('')}<th>Stato</th></tr></thead>
       <tbody>${righeTt(0, t.mostrate)
         || `<tr><td colspan="${TC_COL.length + 4}" class="vuoto">Nessun componente</td></tr>`}</tbody></table></div>
     `;
@@ -3223,7 +3240,7 @@ function disegnaCe() {
       <button class="btn" onclick="incollaCe()">Incolla da Excel</button></div>
     <div class="tabwrap tab-alta"><table class="foglio tab-ce"><colgroup><col style="width:34px"><col style="width:38px"><col style="width:14%"><col style="width:10.6%"><col style="width:10.6%">
       ${CE_NUM.map(k => `<col style="width:${k === 'n_pz' ? 3.8 : k === 'cns_area' ? 5 : 4.3}%">`).join('')}<col style="width:5.5%"><col><col style="width:4%"><col style="width:7.8%"><col style="width:112px"></colgroup><thead><tr>
-      <th class="c-sel"><input type="checkbox" id="ce-tutti" title="Seleziona tutte le righe"></th><th>#</th><th>Componente</th><th>Rinforzo di</th><th>#Materiale</th><th>N° pz</th><th>CNS area</th><th>sec. Taglio</th><th>sec. Prep.</th><th>sec. Ting.</th><th>sec. RMA</th>
+      <th class="c-sel"><input type="checkbox" id="ce-tutti" title="Seleziona tutte le righe"></th><th>#</th><th>Componente</th><th>Rinforzo di</th><th>#Materiale</th><th>N° pz</th><th>CNS area</th><th class="rep rep-taglio">sec. Taglio</th><th class="rep rep-prep">sec. Prep.</th><th class="rep rep-ting">sec. Ting.</th><th class="rep rep-rma">sec. RMA</th>
       <th class="c-ro" title="Si aggiorna da solo: non si modifica">Cod. materiale</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">Descrizione materiale</th><th class="n c-ro" title="Si aggiorna da solo: non si modifica">€</th><th class="c-ro" title="Si aggiorna da solo: non si modifica">TM</th><th></th></tr></thead>
     <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : 'ce-princ'} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
       <td class="c-sel"><input type="checkbox" data-sel="${r.uid}" ${c.sel && c.sel.has(r.uid) ? 'checked' : ''}></td>
@@ -3231,7 +3248,7 @@ function disegnaCe() {
       <td class="ce-nome">${r.padreUid ? `<span class="segno-rinf">${segnoRinf(r)}</span>` : ''}<input data-f="componente" value="${esc(r.componente)}" title="${esc(r.componente)}" placeholder="${r.padreUid ? 'Nome rinforzo' : 'Nome componente'}"></td>
       <td><select data-f="padre"><option value="">— principale —</option>${principaliCe(r.uid).filter(p => !nRinf(r.uid) || p.uid === r.padreUid).map(p => `<option value="${p.uid}" ${p.uid === r.padreUid ? 'selected' : ''}>${esc(p.componente)}</option>`).join('')}</select></td>
       <td><input data-f="n_materiale" list="dl-tipologie" value="${esc(r.n_materiale)}"></td>
-      ${CE_NUM.map(k => `<td><input data-f="${k}" inputmode="decimal" value="${esc(String(r[k] ?? '').replace('.', ','))}"></td>`).join('')}
+      ${CE_NUM.map(k => `<td class="${REP_SEC[k] ? 'rep rep-' + REP_SEC[k] : ''}"><input data-f="${k}" inputmode="decimal" value="${esc(String(r[k] ?? '').replace('.', ','))}"></td>`).join('')}
       <td class="sub c-ro">${esc(r.codice_materiale || '')}</td><td class="sub c-ro ce-descr" title="${esc(r.descr_materiale || '')}">${esc(r.descr_materiale || '')}</td>
       <td class="n sub c-ro">${fmt(r.prezzo, 2)}</td><td class="sub c-ro">${esc(r.tm || '')}</td>
       <td style="white-space:nowrap">${r.padreUid ? '' : `<button class="btn picc" onclick="aggiungiRinforzo(${r.uid})" title="Aggiungi un rinforzo sotto questo componente">+ rinf.</button>`}
@@ -3239,7 +3256,7 @@ function disegnaCe() {
   const barra = $('#ce-barra'); if (barra) { barra.innerHTML = `<span id="ce-stato" class="sub"></span>
       <button class="btn ce-indietro" id="ce-indietro" onclick="ceIndietro()" title="Torna al passaggio precedente (una modifica alla volta)" ${c.storia && c.storia.length ? '' : 'disabled'}>↶ Indietro</button>
       ${S.ctRitorno && S.ctRitorno.pf === c.pf ? '<button class="btn" onclick="tornaATuttiCe()" title="Scarta le modifiche non salvate e torna a Tutti i componenti, dov\'eri">Annulla modifiche</button>'
-        : `<button class="btn" onclick="apriArticoloDb('${esc(c.pf)}')">Annulla modifiche</button>`}<button class="btn prim" id="ce-salva" onclick="salvaCe()">Salva articolo</button>`; barra.classList.remove('nascosto'); } // in alto a destra
+        : `<button class="btn" onclick="apriArticoloDb('${esc(c.pf)}')">Annulla modifiche</button>`}<button class="btn prim" id="ce-salva" onclick="salvaCe()">Salva articolo</button>`; barra.classList.toggle('nascosto', S.ceModo === 'tutti'); } // in alto a destra (non in «Tutti i componenti»)
   const tb = $('.tab-ce tbody');
   const segna = () => { c.modificato = true; aggiornaStatoCe(); };
   $('#ce-descr').addEventListener('input', e => { if (c._fotoCampo !== e.target) { ceFoto(); c._fotoCampo = e.target; } c.descr = e.target.value; segna(); });
