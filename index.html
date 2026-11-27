@@ -2758,7 +2758,8 @@ function vistaAnagrafiche() {
       <span class="sub nascosto" id="an-selinfo"></span><button class="btn peric nascosto" id="an-elimina" onclick="eliminaSelAna()"></button>`;
   if ($('#an-tipo')) { // Tipologia: si scrive (o si sceglie); cerca le tipologie che iniziano così, quella esatta se è una tipologia intera
     let tt; const vai = () => { clearTimeout(tt); const v = $('#an-tipo').value.trim(); if (v === (S.filtri.dibaTipo || '')) return; S.filtri.dibaTipo = v; caricaAna(); };
-    $('#an-tipo').addEventListener('input', () => { clearTimeout(tt); tt = setTimeout(vai, 400); });
+    $('#an-tipo').addEventListener('input', e => { // scelta dall'elenco (inputType assente) = quella tipologia; scritta = ricerca libera
+      const dalla = !e.inputType || e.inputType === 'insertReplacementText'; S.filtri.dibaTipoScelta = dalla ? e.target.value.trim() : ''; clearTimeout(tt); tt = setTimeout(vai, dalla ? 0 : 400); });
     $('#an-tipo').addEventListener('change', vai);
     $('#an-tipo').addEventListener('keydown', e => { if (e.key === 'Enter') vai(); });
   }
@@ -3381,8 +3382,8 @@ async function salvaCe() { // (la tabella "Tutti i componenti" si ricarica quand
   } catch (e) { toast(e.message, 'err'); $('#ce-salva').disabled = false; }
 }
 
-const tipoDiba = v => { v = String(v || '').trim(); if (!v) return ''; // tipologia intera → quella esatta; altrimenti tutte quelle che iniziano così
-  return TIPOLOGIE_BASE.some(x => x.toUpperCase() === v.toUpperCase()) ? v : v.replace(/\*+$/, '') + '*'; };
+const tipoDiba = v => { v = String(v || '').trim(); if (!v) return ''; // scelta dall'elenco → quella; scritta a mano → ricerca libera («mat 2», «infu», «fod»)
+  return TIPOLOGIE_BASE.some(x => x.toUpperCase() === v.toUpperCase()) && S.filtri.dibaTipoScelta === v ? '=' + v : v; };
 async function caricaAna(offset = 0, opz = {}) {
   const t = S.filtri.anaTab || 'componenti';
   S.filtri.anaQ = $('#an-q').value.trim();
