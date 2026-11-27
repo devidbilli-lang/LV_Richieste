@@ -2765,7 +2765,7 @@ function stEsporta() { // come i fogli «Scheda tempi» e «Consumi» del file d
 }
 function vistaAnagrafiche() {
   const t = S.filtri.anaTab || 'componenti';
-  $('#vista').innerHTML = `<div class="db-testa"><div class="sotto-tab">${Object.entries(TAB).map(([k, v]) => `<button class="${k === t ? 'att' : ''}" onclick="cambiaTabDb('${k}')">${v.t}</button>`).join('')}${isAdmin() ? `<button class="${t === 'schede_tempi' ? 'att' : ''}" onclick="cambiaTabDb('schede_tempi')">Schede tempi</button>` : ''}</div>
+  $('#vista').innerHTML = `<div class="db-testa"><div class="sotto-tab">${Object.entries(TAB).map(([k, v]) => `<button class="${k === t ? 'att' : ''}" onclick="cambiaTabDb('${k}')">${v.t}</button>${k === 'componenti' && isAdmin() ? `<button class="${t === 'schede_tempi' ? 'att' : ''}" onclick="cambiaTabDb('schede_tempi')">Schede tempi</button>` : ''}`).join('')}</div>
     <div id="an-extra" class="riga-flex"></div></div><div id="an-corpo"></div>`;
   if (t === 'componenti') return vistaComponentiDb();
   if (t === 'schede_tempi') { $('#an-corpo').innerHTML = ''; return vistaSchedeTempi(); }
