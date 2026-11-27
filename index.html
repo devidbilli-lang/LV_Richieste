@@ -244,6 +244,7 @@ table.foglio.tab-ce th{font-size:11px;padding:4px 3px;white-space:normal;line-he
 .tab-ce tr.ce-rinf td{background:#fff8ea}
 table.foglio.tab-ce tr.ce-rinf td.ce-nome{padding-left:8px}
 .tab-ce .freccia-rinf{color:#a86400;font-weight:800;margin-right:6px}
+.stella-rinf{color:#f2a900;font-weight:800;margin-right:6px;font-size:1.15em;line-height:1;text-shadow:0 0 1px rgba(120,80,0,.45)} /* ★ sotto-componente in pelle */
 .tab-ce tr.ce-mod td:first-child{box-shadow:inset 4px 0 0 #f0a500}
 .tab-ce tr.ce-nuova td{background:#fff6ef}
 .tab-ce tr.ce-nuova td:first-child{box-shadow:inset 5px 0 0 #111}
@@ -1184,6 +1185,13 @@ const xGriglia = td => { const tr = td && td.closest('tr'); return tr ? GRIGLIE.
 const xRighe = g => $$(g.righeSel);
 const xColonne = tr => [...tr.cells].filter(xOk).map(td => td.cellIndex); // solo le celle che si scrivono a mano
 function xInt() { const s = XS; return s && { r0: Math.min(s.r0, s.r1), r1: Math.max(s.r0, s.r1), c0: Math.min(s.c0, s.c1), c1: Math.max(s.c0, s.c1) }; }
+const xNorm = s => ({ r0: Math.min(s.r0, s.r1), r1: Math.max(s.r0, s.r1), c0: Math.min(s.c0, s.c1), c1: Math.max(s.c0, s.c1) });
+const xAree = () => XS ? [...(XS.extra || []).map(xNorm), xInt()] : []; // con Ctrl+clic: più zone non attaccate
+function xCelle() { // celle scelte in tutte le zone, una volta sola, in ordine di riga e di colonna
+  const righe = xRighe(XS.g), out = [], vista = new Set();
+  for (const A of xAree()) for (let r = A.r0; r <= Math.min(A.r1, righe.length - 1); r++) for (const td of righe[r].cells) if (td.cellIndex >= A.c0 && td.cellIndex <= A.c1 && !vista.has(td)) { vista.add(td); out.push({ r, td }); }
+  return out.sort((a, b) => a.r - b.r || a.td.cellIndex - b.td.cellIndex);
+}
 function xPulisci() { XS = null; $$('td.xsel').forEach(t => t.classList.remove('xsel')); if (xManiglia) xManiglia.remove(); xManiglia = null; if (typeof aggiornaSomma === 'function') aggiornaSomma(); }
 function xMostra() {
   $$('td.xsel').forEach(t => t.classList.remove('xsel'));
@@ -1191,9 +1199,10 @@ function xMostra() {
   const righe = xRighe(XS.g), I = xInt();
   if (!righe.length || I.r1 >= righe.length) return xPulisci();
   let ultima = null;
-  for (let r = I.r0; r <= I.r1; r++) for (const td of righe[r].cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1 && xOk(td)) { td.classList.add('xsel'); ultima = td; }
+  for (const { td } of xCelle()) if (xOk(td)) td.classList.add('xsel');
+  for (let r = I.r0; r <= I.r1; r++) for (const td of righe[r].cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1 && xOk(td)) ultima = td;
   if (typeof aggiornaSomma === 'function' && !RS) aggiornaSomma();
-  if (!ultima) { if (xManiglia) xManiglia.remove(); xManiglia = null; return; }
+  if (!ultima || (XS.extra && XS.extra.length)) { if (xManiglia) xManiglia.remove(); xManiglia = null; return; } // più zone: niente maniglia
   const w = ultima.closest('.tabwrap'); if (!w) return;
   if (!xManiglia) { xManiglia = document.createElement('div'); xManiglia.className = 'maniglia'; xManiglia.title = 'Trascina per copiare o numerare (Ctrl: copia senza numerare)'; }
   if (xManiglia.parentElement !== w) w.appendChild(xManiglia);
@@ -1249,6 +1258,9 @@ document.addEventListener('mousedown', e => {
   if (!g || !xOk(td)) { if (!e.target.closest('.xsel')) xPulisci(); return; }
   const r = xRighe(g).indexOf(td.parentElement), c = td.cellIndex;
   if (e.shiftKey && XS && XS.g === g) { e.preventDefault(); XS.r1 = r; XS.c1 = c; xMostra(); return; }
+  if ((e.ctrlKey || e.metaKey) && XS && XS.g === g) { // Ctrl+clic: aggiunge un'altra zona (anche non attaccata)
+    XS.extra = [...(XS.extra || []), { r0: XS.r0, c0: XS.c0, r1: XS.r1, c1: XS.c1 }]; XS.r0 = XS.r1 = r; XS.c0 = XS.c1 = c; xTrascina = true; xMostra(); return;
+  }
   XS = { g, r0: r, c0: c, r1: r, c1: c }; xTrascina = true; xMostra();
 }, true);
 document.addEventListener('mousemove', e => {
@@ -1291,17 +1303,18 @@ document.addEventListener('focusin', e => { // con Tab o con un clic la cella sc
   const td = e.target.closest && e.target.closest('td'), g = xGriglia(td);
   if (!g || !xOk(td)) return;
   const r = xRighe(g).indexOf(td.parentElement), I = xInt();
-  if (XS && XS.g === g && r >= I.r0 && r <= I.r1 && td.cellIndex >= I.c0 && td.cellIndex <= I.c1) return;
+  if (XS && XS.g === g && xAree().some(A => r >= A.r0 && r <= A.r1 && td.cellIndex >= A.c0 && td.cellIndex <= A.c1)) return;
   XS = { g, r0: r, c0: td.cellIndex, r1: r, c1: td.cellIndex }; xMostra();
 });
 function xMatrice() { // valori delle celle scelte, riga per riga (solo quelle che si scrivono a mano)
+  if (XS.extra && XS.extra.length) { const per = new Map(); for (const { r, td } of xCelle()) if (xOk(td)) { if (!per.has(r)) per.set(r, []); per.get(r).push(xLeggi(td)); } return [...per.values()]; }
   const righe = xRighe(XS.g), I = xInt(), m = [];
   for (let r = I.r0; r <= I.r1; r++) m.push([...righe[r].cells].filter(td => td.cellIndex >= I.c0 && td.cellIndex <= I.c1 && xOk(td)).map(xLeggi));
   return m;
 }
 document.addEventListener('keydown', e => {
   if (!XS || !document.contains(xRighe(XS.g)[0] || null)) return;
-  const I = xInt(), multi = I.r0 !== I.r1 || I.c0 !== I.c1, ae = document.activeElement;
+  const I = xInt(), multi = I.r0 !== I.r1 || I.c0 !== I.c1 || !!(XS.extra && XS.extra.length), ae = document.activeElement;
   let testoScelto = false; try { testoScelto = !!ae && ae.matches('input, textarea') && ae.selectionStart !== ae.selectionEnd; } catch (_) { }
   if (e.key === 'Escape' && multi) { xPulisci(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && (multi || !testoScelto)) {
@@ -1313,7 +1326,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'Delete' || e.key === 'Backspace') && multi) {
     e.preventDefault();
     const righe = xRighe(XS.g), chiavi = righe.map(tr => tr.dataset[XS.g.chiave]);
-    for (let r = I.r0; r <= I.r1; r++) for (const c of xColonne(righe[r])) if (c >= I.c0 && c <= I.c1) xScrivi(XS.g, chiavi[r], c, '');
+    for (const { r, td } of xCelle()) if (xOk(td)) xScrivi(XS.g, chiavi[r], td.cellIndex, ''); // tutte le zone scelte
     if (XS.g.tabella) { if (confirm('Svuotare le celle scelte? Il Database si aggiorna subito.')) xSalvaPend().then(k => k && toast(`Svuotate ${k} celle`, 'ok')); else XPEND = []; }
     xMostra();
   }
@@ -1324,13 +1337,13 @@ document.addEventListener('paste', e => {
   if (!dentro && !(ae === document.body)) return;
   let t = (e.clipboardData || window.clipboardData).getData('text'); if (t == null) return;
   t = t.replace(/\r/g, ''); if (t.endsWith('\n')) t = t.slice(0, -1);
-  const m = t.split('\n').map(r => r.split('\t')), I = xInt(), multi = I.r0 !== I.r1 || I.c0 !== I.c1, una = m.length === 1 && m[0].length === 1;
+  const m = t.split('\n').map(r => r.split('\t')), I = xInt(), multi = I.r0 !== I.r1 || I.c0 !== I.c1 || !!(XS.extra && XS.extra.length), una = m.length === 1 && m[0].length === 1;
   if (una && !multi && ae && ae.matches('input, textarea')) return; // una sola cella: incolla normale nella casella
   e.preventDefault();
   const g = XS.g; let righe = xRighe(g), n = 0;
   if (una) { // un valore su tutte le celle scelte
     const chiavi = righe.map(tr => tr.dataset[g.chiave]);
-    for (let r = I.r0; r <= I.r1; r++) for (const c of xColonne(righe[r])) if (c >= I.c0 && c <= I.c1 && xScrivi(g, chiavi[r], c, m[0][0])) n++;
+    for (const { r, td } of xCelle()) if (xOk(td) && xScrivi(g, chiavi[r], td.cellIndex, m[0][0])) n++; // anche sulle zone scelte con Ctrl
   } else { // tabella copiata (anche da Excel): dalla prima cella scelta in giù e a destra, sulle colonne che si scrivono a mano
     if (!g.tabella) while (righe.length < I.r0 + m.length) { const prima = righe.length; g.aggiungi(); righe = xRighe(g); if (righe.length === prima) break; }
     const chiavi = righe.map(tr => tr.dataset[g.chiave]);
@@ -1350,10 +1363,15 @@ let RS = null, rsTrascina = false;
 const rsTd = el => { const td = el && el.closest && el.closest('td'); return td && td.closest('.tabwrap table') && !td.closest('thead, tfoot') ? td : null; };
 const rsNum = t => { const s = String(t ?? '').replace(/ /g, ' ').trim().replace(/\s*(€|%|s|min)$/i, ''); return /^-?\d{1,3}(\.\d{3})*(,\d+)?$|^-?\d+(,\d+)?$|^-?\d+\.\d+$/.test(s) ? Number(/,/.test(s) || /^\-?\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, '').replace(',', '.') : s) : null; };
 function rsInt(s) { return { r0: Math.min(s.r0, s.r1), r1: Math.max(s.r0, s.r1), c0: Math.min(s.c0, s.c1), c1: Math.max(s.c0, s.c1) }; }
+function rsCelle() { // celle scelte in tutte le zone (Ctrl+clic), una volta sola, in ordine
+  const righe = [...RS.tb.rows], out = [], vista = new Set();
+  for (const A of [...(RS.extra || []), RS].map(rsInt)) for (let r = A.r0; r <= Math.min(A.r1, righe.length - 1); r++) for (const td of righe[r].cells) if (td.cellIndex >= A.c0 && td.cellIndex <= A.c1 && !vista.has(td)) { vista.add(td); out.push({ r, td }); }
+  return out.sort((a, b) => a.r - b.r || a.td.cellIndex - b.td.cellIndex);
+}
 function aggiornaSomma() { // Somma · Media · Celle, quando le celle scelte sono almeno 2
   let el = $('#xsomma'), celle = [];
-  if (RS && document.contains(RS.tb)) { const I = rsInt(RS); for (const tr of [...RS.tb.rows].slice(I.r0, I.r1 + 1)) for (const td of tr.cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1) celle.push(td.textContent); }
-  else if (XS && xRighe(XS.g).length) { const I = xInt(), righe = xRighe(XS.g); for (let r = I.r0; r <= Math.min(I.r1, righe.length - 1); r++) for (const td of righe[r].cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1) celle.push(xOk(td) ? xLeggi(td) : td.textContent); }
+  if (RS && document.contains(RS.tb)) { for (const { td } of rsCelle()) celle.push(td.textContent); }
+  else if (XS && xRighe(XS.g).length) { for (const { td } of xCelle()) celle.push(xOk(td) ? xLeggi(td) : td.textContent); }
   if (celle.length < 2) { if (el) el.remove(); return; }
   const nums = celle.map(rsNum).filter(v => v !== null), somma = nums.reduce((a, b) => a + b, 0);
   if (!el) { el = document.createElement('div'); el.id = 'xsomma'; document.body.appendChild(el); }
@@ -1363,8 +1381,7 @@ function rsPulisci() { RS = null; $$('td.xsel-ro').forEach(t => t.classList.remo
 function rsMostra() {
   $$('td.xsel-ro').forEach(t => t.classList.remove('xsel-ro'));
   if (!RS) return aggiornaSomma();
-  const I = rsInt(RS);
-  for (const tr of [...RS.tb.rows].slice(I.r0, I.r1 + 1)) for (const td of tr.cells) if (td.cellIndex >= I.c0 && td.cellIndex <= I.c1) td.classList.add('xsel-ro');
+  for (const { td } of rsCelle()) td.classList.add('xsel-ro');
   aggiornaSomma();
 }
 document.addEventListener('mousedown', e => {
@@ -1373,6 +1390,9 @@ document.addEventListener('mousedown', e => {
   if (!td || e.target.closest('input, select, textarea, button, a, label, .maniglia') || xOk(td)) { if (RS) rsPulisci(); return; } // le celle che si scrivono hanno la loro selezione
   const tb = td.parentElement.parentElement, r = [...tb.rows].indexOf(td.parentElement), c = td.cellIndex;
   if (e.shiftKey && RS && RS.tb === tb) { e.preventDefault(); RS.r1 = r; RS.c1 = c; rsMostra(); return; }
+  if ((e.ctrlKey || e.metaKey) && RS && RS.tb === tb) { // Ctrl+clic: un'altra zona, anche non attaccata
+    e.preventDefault(); RS.extra = [...(RS.extra || []), { r0: RS.r0, c0: RS.c0, r1: RS.r1, c1: RS.c1 }]; RS.r0 = RS.r1 = r; RS.c0 = RS.c1 = c; rsTrascina = true; rsMostra(); return;
+  }
   RS = { tb, r0: r, c0: c, r1: r, c1: c }; rsTrascina = true; rsMostra();
 }, true);
 document.addEventListener('mousemove', e => {
@@ -1391,7 +1411,8 @@ document.addEventListener('keydown', e => { // Ctrl+C sulle celle scelte (testo 
   if (e.key === 'Escape') return rsPulisci();
   if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c')) return;
   const s = window.getSelection(); if (s && String(s).trim()) return; // testo scelto a mano: copia normale
-  const I = rsInt(RS), t = [...RS.tb.rows].slice(I.r0, I.r1 + 1).map(tr => [...tr.cells].filter(td => td.cellIndex >= I.c0 && td.cellIndex <= I.c1).map(td => td.textContent.replace(/[⇊✎]/g, '').trim()).join('\t')).join('\n');
+  const per = new Map(); for (const { r, td } of rsCelle()) { if (!per.has(r)) per.set(r, []); per.get(r).push(td.textContent.replace(/[⇊✎]/g, '').trim()); }
+  const t = [...per.values()].map(x => x.join('\t')).join('\n'); // con più zone: riga per riga
   if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => { });
   S.xAppunti = t; e.preventDefault(); toast('Celle copiate', 'ok');
 });
@@ -1549,7 +1570,7 @@ function apriRiga(i, lista) { formRiga((lista || S.cache.righe)[i]); }
 function opzioniComponenti(pf, sel) {
   const comps = S.compPerPf.get(pf) || [];
   let html = `<option value="">${pf ? (comps.length ? 'Scegli il componente…' : 'Nessun componente per questo articolo') : 'Scegli prima il codice articolo'}</option>`;
-  html += comps.map(c => `<option value="${esc(c.chiave)}" ${c.chiave === sel ? 'selected' : ''}>${c.padre ? '\u00a0\u00a0\u00a0\u00a0↳ ' : ''}${esc(c.nome)}${c.nRinf ? ` (+${c.nRinf} rinforz${c.nRinf > 1 ? 'i' : 'o'})` : ''}</option>`).join('');
+  html += comps.map(c => `<option value="${esc(c.chiave)}" ${c.chiave === sel ? 'selected' : ''}>${c.padre ? '\u00a0\u00a0\u00a0\u00a0' + (eMatRinf(c) ? '★ ' : '↳ ') : ''}${esc(c.nome)}${c.nRinf ? ` (+${c.nRinf} rinforz${c.nRinf > 1 ? 'i' : 'o'})` : ''}</option>`).join('');
   if (sel && !comps.some(c => c.chiave === sel)) html += `<option value="${esc(sel)}" selected>${esc(sel)} (non in anagrafica)</option>`;
   return html;
 }
@@ -2957,6 +2978,9 @@ const TC_COL = [['n_materiale', '#Materiale'], ['n_pz', 'N° pz', 'n'], ['cns_ar
 const CALCOLATI = new Set(['codice_materiale', 'descr_materiale', 'prezzo', 'tdp', 'um', 'tm']);
 const DERIVATI = { codice_materiale: 'manca in Distinta base per la tipologia', prezzo: 'manca in Items BC', tdp: 'manca nella tabella TDP' };
 const vuoto = v => v === null || v === undefined || String(v).trim() === '';
+// sotto-componenti: ★ quelli in pelle con MATERIALE#, ↳ gli altri (infustiture, accessori…)
+const eMatRinf = c => /MATERIALE#/i.test((c && (c.n_materiale || c.tipo)) || '');
+const segnoRinf = c => eMatRinf(c) ? '<span class="stella-rinf" title="Sotto-componente in pelle (MATERIALE#)">★</span>' : '<span class="freccia-rinf">↳</span>';
 function mancantiCe(c, conRinforzi) { // conRinforzi: principale con rinforzi → il materiale sta nei rinforzi (anche più materiali diversi)
   const acc = /ACCESSORIO/i.test(c.n_materiale || '') || c.tm === 'Accessorio', m = [];
   const inf = /INFUSTITURA/i.test(c.n_materiale || '') || c.tm === 'Infustitura';
@@ -3034,7 +3058,7 @@ function disegnaTuttiCe() {
   // si disegnano le prime righe e le altre man mano che si scorre: con migliaia di righe la tabella intera bloccava la pagina
   const rigaTt = (c, i) => `${i && c.codice_pf !== pagina[i - 1].codice_pf ? `<tr class="tt-sep"><td colspan="${TC_COL.length + 4}"></td></tr>` : ''}<tr class="clic ${c.padre ? 'tt-rinf' : c.princ ? 'tt-princ' : ''}" data-id="${c.id}" data-pf="${esc(c.codice_pf)}">
         <td class="c-art"><b>${esc(c.codice_pf)}</b><div class="sub">${esc(S.art.get(c.codice_pf) || '')}</div></td>
-        <td class="c-comp">${c.padre ? '<span class="freccia-rinf">↳</span>' : ''}${nome(c)}</td><td class="sub c-comp">${c.padre ? esc(String(c.padre).replace(c.codice_pf + '-', '')) : ''}</td>
+        <td class="c-comp">${c.padre ? segnoRinf(c) : ''}${nome(c)}</td><td class="sub c-comp">${c.padre ? esc(String(c.padre).replace(c.codice_pf + '-', '')) : ''}</td>
         ${TC_COL.map(([k, , tipo]) => `<td class="${CALCOLATI.has(k) ? 'c-ro ' : ''}${tipo ? 'c-cifra ' : ''}${k === 'descr_materiale' ? 'c-descr ' : ''}${c.manca.includes(k) ? (DERIVATI[k] ? 'c-manca d' : 'c-manca') : ''}" ${k === 'descr_materiale' && c[k] ? `title="${esc(c[k])}"` : ''}${DERIVATI[k] && c.manca.includes(k) ? ` title="${DERIVATI[k]}"` : ''}>${val(c, k, tipo)}</td>`).join('')}
         <td>${c.manca.length ? `<span class="badge-manca" title="${c.manca.length} campi da completare">${c.manca.length} da compl.</span>` : '<span class="ok-txt">✓</span>'}</td></tr>`;
   const righeTt = (da, a) => pagina.slice(da, a).map((c, j) => rigaTt(c, da + j)).join('');
@@ -3165,7 +3189,7 @@ function disegnaCe() {
     <tbody>${c.righe.map((r, i) => `<tr data-uid="${r.uid}" class="${r.padreUid ? 'ce-rinf' : 'ce-princ'} ${r.id ? (r.mod ? 'ce-mod' : '') : 'ce-nuova'}">
       <td class="c-sel"><input type="checkbox" data-sel="${r.uid}" ${c.sel && c.sel.has(r.uid) ? 'checked' : ''}></td>
       <td class="sub c-centro">${i + 1}</td>
-      <td class="ce-nome">${r.padreUid ? '<span class="freccia-rinf">↳</span>' : ''}<input data-f="componente" value="${esc(r.componente)}" title="${esc(r.componente)}" placeholder="${r.padreUid ? 'Nome rinforzo' : 'Nome componente'}"></td>
+      <td class="ce-nome">${r.padreUid ? `<span class="segno-rinf">${segnoRinf(r)}</span>` : ''}<input data-f="componente" value="${esc(r.componente)}" title="${esc(r.componente)}" placeholder="${r.padreUid ? 'Nome rinforzo' : 'Nome componente'}"></td>
       <td><select data-f="padre"><option value="">— principale —</option>${principaliCe(r.uid).filter(p => !nRinf(r.uid) || p.uid === r.padreUid).map(p => `<option value="${p.uid}" ${p.uid === r.padreUid ? 'selected' : ''}>${esc(p.componente)}</option>`).join('')}</select></td>
       <td><input data-f="n_materiale" list="dl-tipologie" value="${esc(r.n_materiale)}"></td>
       ${CE_NUM.map(k => `<td><input data-f="${k}" inputmode="decimal" value="${esc(String(r[k] ?? '').replace('.', ','))}"></td>`).join('')}
@@ -3182,6 +3206,7 @@ function disegnaCe() {
   tb.addEventListener('input', e => {
     const f = e.target.dataset.f; if (!f || f === 'padre') return;
     const r = rigaCe(e.target); r[f] = e.target.value; if (r.id) { r.mod = true; e.target.closest('tr').classList.add('ce-mod'); } segna();
+    if (f === 'n_materiale') { const s = e.target.closest('tr').querySelector('.segno-rinf'); if (s) s.innerHTML = segnoRinf(r); } // ★ / ↳ mentre scrivi
   });
   if (!c.sel) c.sel = new Set();
   $('#ce-tutti').addEventListener('change', e => { c.sel = new Set(e.target.checked ? c.righe.map(r => r.uid) : []); $$('.tab-ce [data-sel]').forEach(x => { x.checked = e.target.checked; }); aggiornaSelCe(); });
