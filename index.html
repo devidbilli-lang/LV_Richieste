@@ -3717,6 +3717,25 @@ async function eseguiImport() {
 }
 
 avvia();
+
+/* --- intestazioni sempre visibili: la tabella principale di ogni sezione riempie lo schermo e scorre al suo interno,
+   così barra in alto, schede, filtri e testata restano fermi (sezioni con più tabelle: scorre la pagina come prima) --- */
+let adattaRaf = 0;
+function adattaTabelle() {
+  adattaRaf = 0;
+  const v = document.getElementById('vista'); if (!v) return;
+  const tutte = [...v.querySelectorAll('.tabwrap')], vis = tutte.filter(w => w.offsetParent && !w.closest('.no-adatta, details'));
+  for (const w of tutte) if (w.dataset.adatta && !vis.includes(w)) { w.style.maxHeight = ''; delete w.dataset.adatta; }
+  if (vis.length !== 1 || window.matchMedia('print').matches) { for (const w of vis) if (w.dataset.adatta) { w.style.maxHeight = ''; delete w.dataset.adatta; } return; }
+  const w = vis[0], r = w.getBoundingClientRect(), su = r.top + window.scrollY;
+  const dopo = Math.max(0, document.documentElement.scrollHeight - (r.bottom + window.scrollY)); // quello che c'è sotto la tabella (barra Salva…)
+  const h = Math.max(260, Math.floor(window.innerHeight - su - Math.min(dopo, 120) - 8));
+  if (w.style.maxHeight !== h + 'px') { w.style.maxHeight = h + 'px'; w.dataset.adatta = '1'; }
+}
+const chiediAdatta = () => { if (!adattaRaf) adattaRaf = requestAnimationFrame(adattaTabelle); };
+window.addEventListener('resize', chiediAdatta);
+document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app') || document.body; new MutationObserver(chiediAdatta).observe(v, { childList: true, subtree: true }); chiediAdatta(); });
+if (document.readyState !== 'loading') { const v = document.getElementById('app') || document.body; new MutationObserver(chiediAdatta).observe(v, { childList: true, subtree: true }); }
 </script>
 </body>
 </html>
