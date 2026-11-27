@@ -244,6 +244,9 @@ table.foglio.tab-ce th{font-size:11px;padding:4px 3px;white-space:normal;line-he
 .tab-ce tr.ce-rinf td{background:#fff8ea}
 table.foglio.tab-ce tr.ce-rinf td.ce-nome{padding-left:8px}
 .tab-ce .freccia-rinf{color:#a86400;font-weight:800;margin-right:6px}
+.ce-azioni{display:inline-flex;align-items:center;gap:8px;margin-left:auto} /* stato e Salva in alto a destra */
+.ce-azioni #ce-stato{white-space:nowrap}
+.ce-azioni.nascosto{display:none}
 .stella-rinf{color:#f2a900;font-weight:800;margin-right:6px;font-size:1.15em;line-height:1;text-shadow:0 0 1px rgba(120,80,0,.45)} /* ★ sotto-componente in pelle */
 .tab-ce tr.ce-mod td:first-child{box-shadow:inset 4px 0 0 #f0a500}
 .tab-ce tr.ce-nuova td{background:#fff6ef}
@@ -3122,6 +3125,7 @@ function modoCe(m, daCache) {
   $('#ce-art').classList.toggle('nascosto', m !== 'articolo');
   $('#ct-barra').classList.toggle('nascosto', m !== 'tutti');
   $('#ce-out').classList.toggle('nascosto', m !== 'articolo');
+  if ($('#ce-barra')) $('#ce-barra').classList.toggle('nascosto', m !== 'articolo' || !S.ce); // stato e Salva solo con un articolo aperto
   $('#ce-elenco').classList.toggle('nascosto', m !== 'tutti'); // (id diverso dalla casella «seleziona tutte» dell'editor, #ce-tutti)
   if ($('#db-fab')) $('#db-fab').classList.toggle('nascosto', m !== 'articolo');
   if (m === 'tutti') caricaTuttiCe(daCache);
@@ -3138,7 +3142,8 @@ function vistaComponentiDb() {
       <button class="btn prim" onclick="apriArticoloDb()">Apri</button>
       <span class="info-db" id="ce-aiuto" title="Per un articolo nuovo scrivi il codice e premi Apri. I componenti si scrivono direttamente nella tabella: Invio passa alla riga sotto (e ne crea una nuova in fondo), e puoi incollare più righe copiate da Excel. Codice materiale, €, TDP, UM e TM si aggiornano da soli quando cambiano Distinta base, Items BC o TDP.">i</span></span>
     <span class="riga-flex nascosto" id="ct-barra" style="gap:6px"></span>
-    <div class="pillole" id="ce-modo"><button data-m="articolo">Per articolo</button><button data-m="tutti">Tutti i componenti</button></div>`;
+    <div class="pillole" id="ce-modo"><button data-m="articolo">Per articolo</button><button data-m="tutti">Tutti i componenti</button></div>
+    <span class="ce-azioni nascosto" id="ce-barra"></span>`;
   $('#an-corpo').innerHTML = `<div id="ce-out"></div><div id="ce-elenco" class="nascosto"></div>`;
   let dl = $('#dl-articoli-tutti');
   if (!dl) { dl = document.createElement('datalist'); dl.id = 'dl-articoli-tutti'; document.body.appendChild(dl); }
@@ -3146,7 +3151,7 @@ function vistaComponentiDb() {
   $('#ce-pf').addEventListener('keydown', e => { if (e.key === 'Enter') apriArticoloDb(); });
   $('#ce-pf').addEventListener('change', () => { if (S.art.has(codiceDaArt($('#ce-pf').value))) apriArticoloDb(); });
   fabDb('Aggiungi un componente', () => S.ce ? aggiungiCe() : toast('Apri prima un articolo', 'err'));
-  $('#db-fab').classList.add('su'); // sopra la barra "Salva articolo"
+  // la barra «Salva articolo» ora è in alto: il pulsante + Aggiungi resta in basso
   $$('#ce-modo button').forEach(b => b.addEventListener('click', () => modoCe(b.dataset.m)));
   if (S.ce) disegnaCe();
   modoCe(S.ceModo || 'articolo');
@@ -3181,6 +3186,19 @@ function ordinaCe(righe) { // ogni rinforzo subito sotto il suo componente princ
   return righe.filter(r => !r.padreUid).flatMap(r => [r, ...(figli.get(r.uid) || [])]);
 }
 function nuovaRigaCe(base = {}) { return { uid: ++ceUid, id: null, componente: '', n_materiale: base.n_materiale || '', n_pz: 1, cns_area: '', sec_taglio: '', sec_prep: '', sec_ting: '', sec_rma: '', padreUid: base.padreUid || null }; }
+// ↶ passaggio precedente nell'editor componenti: si fotografano le righe prima di ogni modifica
+function ceFoto() {
+  const c = S.ce; if (!c || c._fotoTick) return;
+  c._fotoTick = true; setTimeout(() => { c._fotoTick = false; }, 0); // modifiche fatte insieme (incolla, trascina, Canc, ⇊) = un passaggio solo
+  (c.storia = c.storia || []).push({ righe: c.righe.map(r => ({ ...r, casa: r.casa ? { ...r.casa } : undefined })), descr: c.descr, modificato: c.modificato });
+  if (c.storia.length > 100) c.storia.shift();
+  const b = $('#ce-indietro'); if (b) b.disabled = false;
+}
+function ceIndietro() {
+  const c = S.ce; if (!c || !c.storia || !c.storia.length) return toast('Niente da annullare', 'err');
+  const s = c.storia.pop(); c.righe = s.righe; c.descr = s.descr; c.modificato = s.modificato; c._fotoCampo = null;
+  disegnaCe();
+}
 function principaliCe(esclusa) { return S.ce.righe.filter(r => !r.padreUid && r.uid !== esclusa && String(r.componente).trim()); }
 function disegnaCe() {
   const c = S.ce, box = $('#ce-out'); if (!box) return;
@@ -3215,18 +3233,22 @@ function disegnaCe() {
       <td class="sub c-ro">${esc(r.codice_materiale || '')}</td><td class="sub c-ro ce-descr" title="${esc(r.descr_materiale || '')}">${esc(r.descr_materiale || '')}</td>
       <td class="n sub c-ro">${fmt(r.prezzo, 2)}</td><td class="sub c-ro">${esc(r.tm || '')}</td>
       <td style="white-space:nowrap">${r.padreUid ? '' : `<button class="btn picc" onclick="aggiungiRinforzo(${r.uid})" title="Aggiungi un rinforzo sotto questo componente">+ rinf.</button>`}
-        <button class="icona" title="Elimina" onclick="togliCe(${r.uid})">✕</button></td></tr>`).join('')}</tbody></table></div>
-    <div class="barra-salva" id="ce-barra"><span id="ce-stato" class="sub"></span><div class="spazio" style="flex:1"></div>
+        <button class="icona" title="Elimina" onclick="togliCe(${r.uid})">✕</button></td></tr>`).join('')}</tbody></table></div>`;
+  const barra = $('#ce-barra'); if (barra) { barra.innerHTML = `<span id="ce-stato" class="sub"></span>
+      <button class="btn ce-indietro" id="ce-indietro" onclick="ceIndietro()" title="Torna al passaggio precedente (una modifica alla volta)" ${c.storia && c.storia.length ? '' : 'disabled'}>↶ Indietro</button>
       ${S.ctRitorno && S.ctRitorno.pf === c.pf ? '<button class="btn" onclick="tornaATuttiCe()" title="Scarta le modifiche non salvate e torna a Tutti i componenti, dov\'eri">Annulla modifiche</button>'
-        : `<button class="btn" onclick="apriArticoloDb('${esc(c.pf)}')">Annulla modifiche</button>`}<button class="btn prim" id="ce-salva" onclick="salvaCe()">Salva articolo</button></div>`;
+        : `<button class="btn" onclick="apriArticoloDb('${esc(c.pf)}')">Annulla modifiche</button>`}<button class="btn prim" id="ce-salva" onclick="salvaCe()">Salva articolo</button>`; barra.classList.remove('nascosto'); } // in alto a destra
   const tb = $('.tab-ce tbody');
   const segna = () => { c.modificato = true; aggiornaStatoCe(); };
-  $('#ce-descr').addEventListener('input', e => { c.descr = e.target.value; segna(); });
+  $('#ce-descr').addEventListener('input', e => { if (c._fotoCampo !== e.target) { ceFoto(); c._fotoCampo = e.target; } c.descr = e.target.value; segna(); });
+  $('#ce-descr').addEventListener('focusout', () => { c._fotoCampo = null; });
   tb.addEventListener('input', e => {
     const f = e.target.dataset.f; if (!f || f === 'padre') return;
+    if (c._fotoCampo !== e.target) { ceFoto(); c._fotoCampo = e.target; } // un passaggio per ogni cella che modifichi (non per ogni tasto)
     const r = rigaCe(e.target); r[f] = e.target.value; if (r.id) { r.mod = true; e.target.closest('tr').classList.add('ce-mod'); } segna();
     if (f === 'n_materiale') { const s = e.target.closest('tr').querySelector('.segno-rinf'); if (s) s.innerHTML = segnoRinf(r); } // ★ / ↳ mentre scrivi
   });
+  tb.addEventListener('focusout', () => { c._fotoCampo = null; });
   if (!c.sel) c.sel = new Set();
   $('#ce-tutti').addEventListener('change', e => { c.sel = new Set(e.target.checked ? c.righe.map(r => r.uid) : []); $$('.tab-ce [data-sel]').forEach(x => { x.checked = e.target.checked; }); aggiornaSelCe(); });
   let ultimoSel = null;
@@ -3241,6 +3263,7 @@ function disegnaCe() {
   });
   tb.addEventListener('change', e => {
     if (e.target.dataset.f !== 'padre') return;
+    ceFoto();
     const r = rigaCe(e.target), nuovo = e.target.value ? Number(e.target.value) : null;
     if (!r.padreUid && nuovo && !r.casa) { const pr = c.righe.filter(x => !x.padreUid), i = pr.indexOf(r); r.casa = { dopo: i > 0 ? pr[i - 1].uid : null }; } // era principale: ci si ricorda dove stava
     r.padreUid = nuovo; r.mod = true;
@@ -3265,6 +3288,7 @@ function disegnaCe() {
     if (!/[\t\n]/.test(testo.trim())) return;
     e.preventDefault();
     const f = e.target.dataset.f; if (!f || f === 'padre') return;
+    ceFoto();
     const start = c.righe.indexOf(rigaCe(e.target)), col0 = CE_CAMPI.indexOf(f);
     righeExcel(testo).forEach((cells, k) => {
       let r = c.righe[start + k];
@@ -3293,18 +3317,19 @@ function eliminaSelCe() {
   const via = new Set(c.righe.filter(r => sel.has(r.uid) || (r.padreUid && sel.has(r.padreUid))).map(r => r.uid)); // con i principali vanno anche i loro rinforzi
   const extra = via.size - sel.size;
   if (!confirm(`Eliminare ${fmtN(via.size)} righe di ${c.pf}${extra > 0 ? ` (compresi ${extra} rinforzi collegati)` : ''}?\nLe righe spariscono subito; nel database si tolgono quando premi "Salva articolo".`)) return;
-  c.righe = ordinaCe(c.righe.filter(r => !via.has(r.uid)));
+  ceFoto(); c.righe = ordinaCe(c.righe.filter(r => !via.has(r.uid)));
   c.sel = new Set(); c.modificato = true; disegnaCe();
 }
 // i rinforzi già scritti sotto al loro componente (come nel foglio Database) vengono collegati a quello sopra
 function collegaRinforziAuto() {
+  ceFoto();
   let ultimo = null, n = 0;
   for (const r of S.ce.righe) {
     const rinf = /rinf/i.test(r.componente);
     if (rinf && !r.padreUid && ultimo && !S.ce.righe.some(x => x.padreUid === r.uid)) { r.padreUid = ultimo.uid; r.mod = true; n++; }
     else if (!rinf && !r.padreUid) ultimo = r;
   }
-  if (!n) return toast('Nessun rinforzo da collegare', 'err');
+  if (!n) { S.ce.storia.pop(); return toast('Nessun rinforzo da collegare', 'err'); }
   S.ce.righe = ordinaCe(S.ce.righe); S.ce.modificato = true; disegnaCe();
   toast(`Collegati ${n} rinforzi: controlla la colonna "Rinforzo di" e salva`, 'ok');
 }
@@ -3315,8 +3340,10 @@ function aggiornaStatoCe() {
   const nuove = c.righe.filter(r => !r.id).length, mod = c.righe.filter(r => r.id && r.mod).length;
   el.innerHTML = c.modificato ? `<b style="color:var(--ambra)">Modifiche non salvate</b>${nuove ? ` · ${fmtN(nuove)} nuove` : ''}${mod ? ` · ${fmtN(mod)} modificate` : ''}` : 'Nessuna modifica';
   $('#ce-salva').disabled = !c.modificato;
+  const bi = $('#ce-indietro'); if (bi) bi.disabled = !(c.storia && c.storia.length);
 }
 function aggiungiCe(base = {}, campo = 'componente') {
+  ceFoto();
   const r = nuovaRigaCe(base);
   if (base.padreUid) { // in fondo al gruppo del suo principale
     const idx = S.ce.righe.map(x => x.uid === base.padreUid || x.padreUid === base.padreUid).lastIndexOf(true);
@@ -3334,10 +3361,11 @@ function aggiungiRinforzo(uid) {
 function togliCe(uid) {
   const r = S.ce.righe.find(x => x.uid === uid), figli = S.ce.righe.filter(x => x.padreUid === uid);
   if (figli.length) {
+    ceFoto();
     if (!confirm(`"${r.componente}" ha ${figli.length} rinforz${figli.length > 1 ? 'i' : 'o'}. Eliminare anche ${figli.length > 1 ? 'quelli' : 'quello'}?\n(Annulla = i rinforzi restano come componenti principali)`)) figli.forEach(f => { f.padreUid = null; f.mod = true; });
     else S.ce.righe = S.ce.righe.filter(x => x.padreUid !== uid);
   } else if ((r.id || String(r.componente).trim()) && !confirm(`Eliminare "${r.componente || 'riga'}"?`)) return;
-  S.ce.righe = ordinaCe(S.ce.righe.filter(x => x.uid !== uid));
+  ceFoto(); S.ce.righe = ordinaCe(S.ce.righe.filter(x => x.uid !== uid));
   S.ce.modificato = true; disegnaCe();
 }
 function incollaCe() {
@@ -3358,6 +3386,7 @@ function confermaIncollaCe() {
     return r;
   });
   nuove.forEach(r => { if (r._padre) { const p = perNome.get(r._padre.toLowerCase()); if (p && !p.padreUid) r.padreUid = p.uid; } delete r._padre; });
+  ceFoto();
   if (S.ce.righe.length === 1 && !S.ce.righe[0].id && !String(S.ce.righe[0].componente).trim()) S.ce.righe = [];
   S.ce.righe = ordinaCe(S.ce.righe.concat(nuove));
   S.ce.modificato = true; chiudiModale(); disegnaCe(); toast(`Aggiunte ${fmtN(nuove.length)} righe`, 'ok');
