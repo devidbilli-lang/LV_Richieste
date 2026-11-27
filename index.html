@@ -3019,7 +3019,12 @@ async function caricaTuttiCe(daCache) {
     const righe = (await api('/api/admin/componenti/tutti')).righe, padri = new Set(righe.map(c => c.padre).filter(Boolean));
     // principale senza materiale e CNS solo se tra i rinforzi c'è un pezzo di materiale (Sopra/Sotto…): con sole infustiture/accessori il materiale resta suo
     const conMat = new Set(righe.filter(c => c.padre && !/INFUSTITURA|ACCESSORIO/i.test(c.n_materiale || '') && !['Infustitura', 'Accessorio'].includes(c.tm)).map(c => c.padre));
-    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c, !c.padre && conMat.has(c.chiave)), princ: !c.padre })); // padre = chiave del principale // princ: componente principale (riga viola), con o senza rinforzi
+    // tempi tra principale e rinforzi ★ (MATERIALE#): basta che ci siano da una parte sola, non si segnano in rosso dall'altra
+    const perChiave = new Map(righe.map(c => [c.chiave, c])), stelle = new Map();
+    for (const c of righe) if (c.padre && eMatRinf(c)) { if (!stelle.has(c.padre)) stelle.set(c.padre, []); stelle.get(c.padre).push(c); }
+    const TEMPI = ['sec_taglio', 'sec_prep'], pieno = (x, k) => x && !vuoto(x[k]);
+    const coperto = (c, k) => !c.padre ? (stelle.get(c.chiave) || []).some(x => pieno(x, k)) : eMatRinf(c) && pieno(perChiave.get(c.padre), k);
+    S.ct.righe = righe.map(c => ({ ...c, manca: mancantiCe(c, !c.padre && conMat.has(c.chiave)).filter(k => !(TEMPI.includes(k) && coperto(c, k))), princ: !c.padre })); // padre = chiave del principale // princ: componente principale (riga viola), con o senza rinforzi
     disegnaTuttiCe(); ripristinaTuttiCe();
   }
   catch (e) { toast(e.message, 'err'); }
