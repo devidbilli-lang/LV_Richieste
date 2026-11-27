@@ -2491,7 +2491,8 @@ const ST_FASI = { prep: { foglio: 'preparazione', campo: 'sec_prep', nome: 'Prep
   cns: { consumi: true, campo: 'cns_area', nome: 'Consumi', col: 'CNS area' } }; // Consumi: colonne Pezzi, Codice materiale/Pezzo, Esatto → CNS = Esatto ÷ Pezzi
 const stIstr = F => F.consumi ? 'Carica il file dei consumi: dal foglio «Materiali e componenti» si leggono le colonne Pezzi, Codice materiale/Pezzo e Netto (o Esatto) e si calcola CNS = Netto ÷ Pezzi.' : `Carica la scheda tempi ufficiale: si leggono le colonne A, I, J, K del foglio «${F.nome}».`;
 const stDec = () => ST_FASI[S.st.fase].consumi ? 10 : 2;
-const stF = v => ST_FASI[S.st.fase].consumi ? fmtCns(v) : fmt(v, 2); // CNS con tutti i decimali, secondi con 2
+const st3 = v => v === null || v === undefined || isNaN(v) ? v : Math.round(Number(v) * 1000) / 1000; // consumi automatici: al massimo 3 decimali
+const stF = v => ST_FASI[S.st.fase].consumi ? (v === null || v === undefined || v === '' ? '' : Number(v).toLocaleString(LOCALE_NUM, { maximumFractionDigits: 3 })) : fmt(v, 2); // CNS max 3 decimali, secondi con 2
 const ST_BC = [{ rep: 'taglio', campo: 'sec_taglio', nome: 'Taglio' }, { rep: 'preparazione', campo: 'sec_prep', nome: 'Preparazione' }, { rep: 'rma', campo: 'sec_rma', nome: 'RMA' }, { rep: 'prima tingitura', campo: 'sec_ting', nome: 'Prima tingitura' }];
 const stNorm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 const stNum = v => { if (v === null || v === undefined || v === '') return null; if (typeof v === 'number') return v; const m = String(v).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? Number(m[0]) : null; };
@@ -2617,13 +2618,13 @@ function stGruppi() { // voci da abbinare (non le righe dei materiali), con i lo
     if (!per.has(k)) { per.set(k, { key: k, comp: r.comp, mat: r.mat || '', matDesc: r.matDesc || '', n: 0, tot: 0, cnt: 0 }); out.push(per.get(k)); }
     const g = per.get(k); g.n++; if (r.tot !== null) { g.tot += r.tot; g.cnt++; }
   }
-  if (ST_FASI[T.fase].consumi) for (const g of out) g.tot = g.cnt ? g.tot / g.cnt : 0; // consumi: CNS per pezzo (non si sommano)
+  if (ST_FASI[T.fase].consumi) for (const g of out) g.tot = g.cnt ? st3(g.tot / g.cnt) : 0; // consumi: CNS per pezzo (non si sommano), max 3 decimali
   return out;
 }
 function stNuovi() { // componente → valore nuovo: tempi = somma delle voci; consumi = media delle voci abbinate
   const T = S.st, cons = ST_FASI[T.fase].consumi, acc = new Map();
   for (const g of stGruppi()) { const id = Number(T.abb[g.key]); if (!id) continue; const a = acc.get(id) || { s: 0, n: 0 }; a.s += g.tot; a.n++; acc.set(id, a); }
-  return new Map([...acc].map(([id, a]) => [id, { v: cons ? a.s / a.n : a.s, n: a.n }]));
+  return new Map([...acc].map(([id, a]) => [id, { v: cons ? st3(a.s / a.n) : a.s, n: a.n }]));
 }
 function stDaFoglio() {
   const T = S.st, F = ST_FASI[T.fase];
@@ -2694,13 +2695,13 @@ function stDisegna() {
         <td><select data-st="${esc(g.key)}" style="min-width:240px" ${T.abb[g.key] ? '' : `title="Voce non abbinata: ${cons ? 'il suo consumo non va' : 'i suoi secondi non vanno'} in nessun componente"`}>${opz(T.abb[g.key])}</select>${md ? `<div class="sub" style="color:#b06000;margin-top:3px">⚠ nel Database il componente ha il materiale ${esc(md)}</div>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
     ${(T.comp || []).length ? `<h3 style="margin:16px 0 8px">${F.col} dei componenti</h3>
     <div class="tabwrap"><table class="foglio"><thead><tr><th>Componente</th><th>Attuale${um}</th><th>Nuovo${um}</th><th>Differenza</th></tr></thead>
-      <tbody>${T.comp.map(c => { const x = nv.get(c.id), nuovo = x ? x.v : undefined, att = stNum(c.sec), eps = cons ? 0.00005 : 0.004; return `<tr${nuovo !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : stF(att)}</td>
-        <td>${nuovo !== undefined ? `<b>${stF(nuovo)}</b>${cons && x.n > 1 ? ` <small class="sub">(media di ${x.n} voci)</small>` : ''}` : 'resta com\'è'}</td><td>${nuovo !== undefined && att !== null ? `<span style="color:${nuovo - att > eps ? '#d00000' : nuovo - att < -eps ? '#1e9e4a' : '#999'}">${nuovo - att > 0 ? '+' : ''}${stF(nuovo - att)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+      <tbody>${T.comp.map(c => { const x = nv.get(c.id), nuovo = x ? x.v : undefined, att = stNum(c.sec), eps = cons ? 0.0005 : 0.004; return `<tr${nuovo !== undefined ? '' : ' style="color:#999"'}><td style="text-align:left">${esc(c.nome)}</td><td>${att === null ? '—' : stF(att)}</td>
+        <td>${nuovo !== undefined ? `<b>${stF(nuovo)}</b>${cons && x.n > 1 ? ` <small class="sub">(media di ${x.n} voci)</small>` : ''}` : 'resta com\'è'}</td><td>${nuovo !== undefined && att !== null ? `${(d => `<span style="color:${d > eps ? '#d00000' : d < -eps ? '#1e9e4a' : '#999'}">${d > 0 ? '+' : ''}${stF(d)}</span>`)(cons ? (st3(nuovo - att) || 0) : nuovo - att)}` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
     ${cons ? '' : stHtmlBc()}
     <details style="margin-top:14px"><summary class="sub" style="cursor:pointer">Righe lette ${cons ? '(Pezzi, Codice materiale/Pezzo, Esatto) e CNS calcolato' : 'dal foglio (A, I, J, K) e Totale calcolato'}</summary>
       <div class="tabwrap" style="margin-top:8px;max-height:420px"><table class="foglio">${cons
         ? `<thead><tr><th>Riga</th><th>Pezzi</th><th>Codice materiale/Pezzo</th><th>Netto / Esatto</th><th>CNS per pezzo</th></tr></thead>
-        <tbody>${T.righe.map(r => `<tr${r.materiale ? ' style="font-weight:700;background:#f4f4f4"' : ''}><td class="sub">${r.riga}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td style="text-align:left">${esc(r.comp)}${r.materiale ? ` <small class="sub">materiale${r.desc ? ' · ' + esc(r.desc) : ''}</small>` : ''}</td><td>${r.esatto === null ? '' : fmtCns(r.esatto)}</td><td>${r.materiale || r.tot === null ? '' : `<b>${fmtCns(r.tot)}</b>`}</td></tr>`).join('')}</tbody>`
+        <tbody>${T.righe.map(r => `<tr${r.materiale ? ' style="font-weight:700;background:#f4f4f4"' : ''}><td class="sub">${r.riga}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td style="text-align:left">${esc(r.comp)}${r.materiale ? ` <small class="sub">materiale${r.desc ? ' · ' + esc(r.desc) : ''}</small>` : ''}</td><td>${r.esatto === null ? '' : fmtCns(r.esatto)}</td><td>${r.materiale || r.tot === null ? '' : `<b>${stF(r.tot)}</b>`}</td></tr>`).join('')}</tbody>`
         : `<thead><tr><th>Riga</th><th>Componente</th><th>N°Componenti</th><th>Coeff. [s]</th><th>TC [s]</th><th>Totale</th></tr></thead>
         <tbody>${T.righe.map(r => `<tr><td class="sub">${r.riga}</td><td style="text-align:left">${esc(r.comp)}</td><td>${r.n === null ? '' : fmtN(r.n)}</td><td>${esc(r.coeff ?? '')}</td><td>${r.tc === null ? '' : fmtN(r.tc)}</td><td><b>${r.tot === null ? '' : fmt(r.tot, 2)}</b></td></tr>`).join('')}</tbody>`}</table></div></details></div>`;
   $$('#st-corpo select[data-st]').forEach(s => s.addEventListener('change', e => { T.abb[e.target.dataset.st] = e.target.value; T.man = [...new Set([...(T.man || []), e.target.dataset.st])]; stDisegna(); }));
@@ -2738,7 +2739,7 @@ async function stSalva() {
 function stEsporta() { // come i fogli «Scheda tempi» e «Consumi» del file delle formule
   const T = S.st, F = ST_FASI[T.fase];
   if (F.consumi) {
-    const aoa = [['', 'Pezzi', 'Codice materiale/Pezzo', 'Esatto', '', 'CNS per pezzo'], ...T.righe.map(r => ['', r.n, r.comp, r.esatto, '', r.materiale || r.tot === null ? '' : r.tot])];
+    const aoa = [['', 'Pezzi', 'Codice materiale/Pezzo', 'Esatto', '', 'CNS per pezzo'], ...T.righe.map(r => ['', r.n, r.comp, r.esatto, '', r.materiale || r.tot === null ? '' : st3(r.tot)])];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Consumi');
     return XLSX.writeFile(wb, `Consumi ${T.pf || ''}.xlsx`.replace(/\s+/g, ' '));
   }
