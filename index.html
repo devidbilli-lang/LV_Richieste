@@ -528,6 +528,11 @@ table.tab-tutti tr:not(.tt-princ) td.rep-prep:not(.c-manca){background:#e6f7ec!i
 table.tab-tutti tr:not(.tt-princ) td.rep-ting:not(.c-manca){background:#f3eafd!important;color:#6a2bb0}
 table.tab-tutti tr:not(.tt-princ) td.rep-rma:not(.c-manca){background:#fff1e5!important;color:#b35a0c}
 table.tab-tutti tr.tt-princ td.rep-taglio{color:#0b4fa8}table.tab-tutti tr.tt-princ td.rep-prep{color:#1b7a43}table.tab-tutti tr.tt-princ td.rep-ting{color:#6a2bb0}table.tab-tutti tr.tt-princ td.rep-rma{color:#b35a0c}
+.presenti{display:flex;align-items:center;margin-right:12px} /* chi è collegato adesso */
+.presenti .pres{width:30px;height:30px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;display:inline-flex;align-items:center;justify-content:center;border:2px solid #fff;margin-left:-7px;box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:default;user-select:none;letter-spacing:.3px}
+.presenti .pres:first-child{margin-left:0}
+.presenti .pres.qui{outline:2px solid #22c55e;outline-offset:1px;z-index:1}
+.presenti .pres.piu{background:#6b7280}
 </style>
 </head>
 <body>
@@ -777,6 +782,7 @@ async function entra() {
   } catch (e) { toast(e.message, 'err'); }
 }
 function esci(scaduta) {
+  if (S.token && scaduta !== true) api('/api/presenza', { method: 'POST', body: { esci: true } }).catch(() => {}); // sparisce subito dagli altri
   S.token = null; S.profilo = null; store.del('rlv_token');
   chiudiModale(); schermataLogin();
   if (scaduta === true) toast('Sessione scaduta: accedi di nuovo', 'err');
@@ -842,6 +848,7 @@ async function controllaNovita() {
     }
   } catch (e) {}
   finally { S.controllo = false; }
+  inviaPresenza(); // chi è collegato adesso
   if (S.novita) aggiornaDaAltri();
 }
 // Anagrafiche cambiate (articolo, componente, motivazione, operatore nuovi…): si ricaricano quando servono davvero, cioè appena
@@ -873,6 +880,7 @@ function mostraApp() {
   const p = S.profilo;
   $('#app').innerHTML = `<header><div class="barra"><div class="marchio-app"><small>LV_Richieste</small></div>
     <span class="spazio"></span>
+    <div id="presenti" class="presenti"></div>
     <span class="chip">${esc(p.nome)}</span><button class="btn-header" onclick="esci()">Esci</button></div>
     <nav id="nav">${voci().map(([k, t]) => `<button data-v="${k}" class="${['anagrafiche', 'profili', 'import'].includes(k) ? 't-grigio' : 't-arancio'}" onclick="vai('${k}')">${t}<span class="conta nascosto" id="c-${k}"></span></button>`).join('')}</nav></header>
     <main id="vista"></main>`;
@@ -891,6 +899,7 @@ function vai(v) {
   $('#vista').innerHTML = '';
   f();
   aggiornaAnaSeServe(); // se nel frattempo sono cambiate le anagrafiche
+  inviaPresenza();
 }
 async function aggiornaContaElabora() {
   try {
@@ -2497,7 +2506,7 @@ const TAB = {
 };
 function cambiaTabDb(k) {
   if (S.filtri.anaTab === 'componenti' && S.ce && S.ce.modificato && k !== 'componenti' && !confirm(`Le modifiche a ${S.ce.pf} non sono salvate. Uscire comunque?`)) return;
-  S.filtri.anaTab = k; S.filtri.anaQ = ''; S.filtri.anaOrd = ''; vistaAnagrafiche();
+  S.filtri.anaTab = k; S.filtri.anaQ = ''; S.filtri.anaOrd = ''; vistaAnagrafiche(); inviaPresenza();
 }
 /* --- Database › Schede tempi: si carica la scheda tempi ufficiale (Excel), si prendono le colonne A, I, J, K del foglio
    della fase (Componente, N°Componenti, Coeff. [s], TC [s]) e si calcola il Totale come nel foglio «Formula per schede tempi»:
@@ -3785,6 +3794,31 @@ const chiediAdatta = () => { if (!adattaRaf) adattaRaf = requestAnimationFrame(a
 window.addEventListener('resize', chiediAdatta);
 document.addEventListener('DOMContentLoaded', () => { const v = document.getElementById('app') || document.body; new MutationObserver(chiediAdatta).observe(v, { childList: true, subtree: true }); chiediAdatta(); });
 if (document.readyState !== 'loading') { const v = document.getElementById('app') || document.body; new MutationObserver(chiediAdatta).observe(v, { childList: true, subtree: true }); }
+
+/* --- chi è collegato adesso: come i fogli Google condivisi, un cerchio con le iniziali per ogni persona nell'app --- */
+const COL_PRES = ['#e8590c', '#1c7ed6', '#2f9e44', '#ae3ec9', '#f08c00', '#0c8599', '#d6336c', '#5f3dc4'];
+const colPres = n => COL_PRES[[...String(n)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % COL_PRES.length];
+const inizialiPres = n => String(n).trim().split(/\s+/).slice(0, 2).map(x => x[0] || '').join('').toUpperCase() || '?';
+function sezioneAttuale() {
+  if (!S.profilo) return '';
+  const v = (voci().find(x => x[0] === S.vista) || [])[1] || '';
+  if (S.vista !== 'anagrafiche' || !S.filtri || !S.filtri.anaTab) return v;
+  return `${v} › ${S.filtri.anaTab === 'schede_tempi' ? 'Schede tempi' : ((TAB[S.filtri.anaTab] || {}).t || '')}`;
+}
+async function inviaPresenza() {
+  if (!S.token || document.hidden || S.presInvio) return;
+  S.presInvio = true;
+  try { const r = await api('/api/presenza', { method: 'POST', body: { sezione: sezioneAttuale() } }); disegnaPresenti(r.presenti || []); } catch (e) {}
+  finally { S.presInvio = false; }
+}
+function disegnaPresenti(l) {
+  const box = $('#presenti'); if (!box) return;
+  const mia = sezioneAttuale(), altri = l.filter(x => S.profilo && x.nome !== S.profilo.nome);
+  const dove = x => `${x.nome} · ${x.sezione || 'nell\'app'}${x.sezione && x.sezione === mia ? ' (qui con te)' : ''}`;
+  box.innerHTML = altri.slice(0, 6).map(x => `<span class="pres${x.sezione && x.sezione === mia ? ' qui' : ''}" style="background:${colPres(x.nome)}" title="${esc(dove(x))}">${esc(inizialiPres(x.nome))}</span>`).join('')
+    + (altri.length > 6 ? `<span class="pres piu" title="${esc(altri.slice(6).map(dove).join('\n'))}">+${altri.length - 6}</span>` : '');
+  box.title = altri.length ? `Collegati adesso: ${altri.length}` : '';
+}
 </script>
 </body>
 </html>
