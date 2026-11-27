@@ -3813,6 +3813,7 @@ async function inviaPresenza() {
 }
 function disegnaPresenti(l) {
   const box = $('#presenti'); if (!box) return;
+  if (!isAdmin()) { box.innerHTML = ''; return; } // solo l'amministratore vede chi è collegato
   const mia = sezioneAttuale(), altri = l.filter(x => S.profilo && x.nome !== S.profilo.nome);
   const dove = x => `${x.nome} · ${x.sezione || 'nell\'app'}${x.sezione && x.sezione === mia ? ' (qui con te)' : ''}`;
   box.innerHTML = altri.slice(0, 6).map(x => `<span class="pres${x.sezione && x.sezione === mia ? ' qui' : ''}" style="background:${colPres(x.nome)}" title="${esc(dove(x))}">${esc(inizialiPres(x.nome))}</span>`).join('')
