@@ -2474,7 +2474,7 @@ const TAB = {
 };
 function cambiaTabDb(k) {
   if (S.filtri.anaTab === 'componenti' && S.ce && S.ce.modificato && k !== 'componenti' && !confirm(`Le modifiche a ${S.ce.pf} non sono salvate. Uscire comunque?`)) return;
-  S.filtri.anaTab = k; S.filtri.anaQ = ''; vistaAnagrafiche();
+  S.filtri.anaTab = k; S.filtri.anaQ = ''; S.filtri.anaOrd = ''; vistaAnagrafiche();
 }
 /* --- Database › Schede tempi: si carica la scheda tempi ufficiale (Excel), si prendono le colonne A, I, J, K del foglio
    della fase (Componente, N°Componenti, Coeff. [s], TC [s]) e si calcola il Totale come nel foglio «Formula per schede tempi»:
@@ -3389,7 +3389,7 @@ async function caricaAna(offset = 0, opz = {}) {
   S.filtri.anaQ = $('#an-q').value.trim();
   const w0 = $('#an-tab .tabwrap'), pos = opz.mantieni && w0 ? { t: w0.scrollTop, l: w0.scrollLeft, y: window.scrollY } : null; // dopo un salvataggio si resta dove si stava lavorando
   try {
-    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '', tipo: t === 'distinta' ? tipoDiba(S.filtri.dibaTipo) : '' } });
+    const r = await api('/api/admin/tabella/' + t, { query: { q: S.filtri.anaQ, limit: 200, offset, pf: t === 'distinta' ? codiceDaArt(S.filtri.dibaPf) : '', tipo: t === 'distinta' ? tipoDiba(S.filtri.dibaTipo) : '', ord: S.filtri.anaOrd || '', dir: S.filtri.anaDir || '' } });
     if (!$('#an-tab')) return;
     if (opz.fine && offset + r.righe.length < r.totale) return caricaAna(Math.floor((r.totale - 1) / 200) * 200, opz); // nel frattempo sono arrivate altre righe
     if (opz.fine && r.righe.length) opz.evidenzia = r.righe[r.righe.length - 1].id; // l'ultima riga di tutta la tabella
@@ -3397,7 +3397,7 @@ async function caricaAna(offset = 0, opz = {}) {
     const cfg = TAB[t];
     $('#an-info').textContent = `${fmtN(r.totale)} record${r.totale > 200 ? ` · ${offset + 1}-${offset + r.righe.length}` : ''}`;
     S.filtri.anaTot = r.totale; S.filtri.anaOff = offset;
-    $('#an-tab').innerHTML = `<div class="tabwrap tab-alta"><table><thead><tr><th class="c-sel"><input type="checkbox" id="an-tutti" title="Seleziona tutte le righe della pagina"></th>${cfg.c.map(c => `<th class="${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}" ${c[2] === 'ro' ? 'title="Calcolata: non si modifica"' : ''}>${c[1]}</th>`).join('')}<th></th></tr></thead>
+    $('#an-tab').innerHTML = `<div class="tabwrap tab-alta"><table><thead><tr><th class="c-sel"><input type="checkbox" id="an-tutti" title="Seleziona tutte le righe della pagina"></th>${cfg.c.map(c => `<th class="ord ${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}" onclick="ordinaAna('${c[0]}')" title="${c[2] === 'ro' ? 'Calcolata: non si modifica · ' : ''}Ordina">${c[1]}${S.filtri.anaOrd === c[0] ? `<span class="freccia">${S.filtri.anaDir === 'desc' ? '▼' : '▲'}</span>` : '<span class="freccia spenta">▲▼</span>'}</th>`).join('')}<th></th></tr></thead>
       <tbody>${r.righe.map((x, i) => `<tr data-id="${x.id}" class="${S.selAna.has(x.id) ? 'sel' : ''}"><td class="c-sel"><input type="checkbox" data-sel="${x.id}" ${S.selAna.has(x.id) ? 'checked' : ''}></td>${cfg.c.map(c => `<td data-k="${c[0]}"${c[2] !== 'ro' && !(NON_COPIABILI[t] || []).includes(c[0]) ? ' data-ed="1"' : ''} class="${c[2] === 'n' ? 'n' : ''} ${c[2] === 'ro' ? 'c-ro' : ''}">${c[2] === 'n' ? (c[0] === 'cns_area' ? fmtCns(x[c[0]]) : fmtN(x[c[0]])) : esc(x[c[0]] ?? '')}</td>`).join('')}
         <td><button class="icona" onclick="editAna(${i})">✎</button></td></tr>`).join('')}</tbody></table></div>
       <div class="riga-flex" style="justify-content:center;margin:10px">${offset > 0 ? `<button class="btn" onclick="caricaAna(${Math.max(0, offset - 200)})">← Precedenti</button>` : ''}
@@ -3422,6 +3422,10 @@ async function caricaAna(offset = 0, opz = {}) {
       tr.classList.add('evidenzia');
     }
   } catch (e) { toast(e.message, 'err'); }
+}
+function ordinaAna(k) { // clic sull'intestazione: ordina per quella colonna (secondo clic: al contrario)
+  if (S.filtri.anaOrd === k) S.filtri.anaDir = S.filtri.anaDir === 'desc' ? 'asc' : 'desc'; else { S.filtri.anaOrd = k; S.filtri.anaDir = 'asc'; }
+  caricaAna();
 }
 function aggiornaSelAna() {
   const n = S.selAna.size, b = $('#an-elimina'), info = $('#an-selinfo'), tutti = $('#an-tutti'); if (!b) return;
