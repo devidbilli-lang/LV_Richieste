@@ -2326,7 +2326,10 @@ function ordinaModulo(k) {
 }
 function disegnaModulo() {
   if (!$('#mo-tab')) return;
-  const m = S.cache.modulo, comp = m ? m.componenti.slice() : [];
+  // rinforzi e sotto-rinforzi non compaiono come righe: i loro minuti vanno nel componente principale
+  const somma = (a, b) => a === null || a === undefined ? (b ?? null) : b === null || b === undefined ? a : a + b;
+  const unisci = c => (c.rinforzi || []).reduce((t, x) => ({ ...t, min_taglio: somma(t.min_taglio, x.min_taglio), min_prep: somma(t.min_prep, x.min_prep), min_ting: somma(t.min_ting, x.min_ting), min_rma: somma(t.min_rma, x.min_rma) }), { ...c, rinforzi: [] });
+  const m = S.cache.modulo, comp = m ? m.componenti.map(unisci) : [];
   const o = S.filtri.modOrd, seg = o.dir === 'asc' ? 1 : -1;
   comp.sort((a, b) => {
     const x = a[o.k], y = b[o.k];
@@ -2334,7 +2337,7 @@ function disegnaModulo() {
     if (x === null || x === undefined) return 1; if (y === null || y === undefined) return -1;
     return seg * (x - y);
   });
-  const righe = comp.flatMap(c => [c, ...(c.rinforzi || []).map(x => ({ ...x, _rinf: true }))]);
+  const righe = comp; // solo i componenti della richiesta
   const v = (x, k) => k === 'componente' ? (x._rinf ? '↳ ' : '') + esc(x[k] || '') : k === 'pz' ? fmtN(x[k]) : fmt(x[k], 1);
   const freccia = k => o.k === k ? `<span class="mod-fr">${o.dir === 'asc' ? '▲' : '▼'}</span>` : '';
   $('#mo-tab').innerHTML = `<table class="mod-tabella"><thead><tr>${COL_MODULO.map(([k, t]) => `<th class="${k === 'pz' ? 'rosso' : ''}${k === 'componente' ? ' sx' : ''}" onclick="ordinaModulo('${k}')">${t}${freccia(k)}</th>`).join('')}</tr></thead>
